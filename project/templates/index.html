@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CS 527 Project</title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script>
+        function queryExecution(){
+            let query = document.getElementById('query').value;
+            if(query.length == 0){
+                alert("Empty Query!");
+                return;
+            }
+            let databaseTypes = document.getElementsByName('database');
+            let databaseType;   //mysql or redshift or mongodb
+            for (let i = 0; i < databaseTypes.length; i++) {
+                if(databaseTypes[i].checked){
+                    databaseType = databaseTypes[i].value
+                    break;
+                }
+            }
+            let currentDatabaseName = document.getElementById('current-database');
+
+            $.ajax(
+                {
+                    url:'ajax_submit/',
+                    type: 'POST',
+                    data: {'databaseType': databaseType, 'query': query, 'currentDatabase': currentDatabaseName.innerText},
+                    success: function(arg){
+                        document.getElementById('result-area').value = arg['result'];
+                        document.getElementById('execution-time').innerText = arg['executionTime'];
+                        currentDatabaseName.innerText = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
+                    }
+                });
+        }
+    </script>
+</head>
+<body>
+<div style="margin: auto; width: fit-content">
+    <form action="" method="post">
+        <div id="database-div">
+            <p style="display: inline-block; margin: 0">Database:</p>
+            <div style="display: inline-block; border: 1px solid">
+                <p id="current-database" style="display: inline-block; margin: 0;">{{database}}</p>
+            </div>
+            <label style="margin-left: 10%">
+                <input type="radio" name="database" value="mysql" checked>MySQL
+                <input type="radio" name="database" value="redshift" style="margin-left: 10%">Redshift
+            </label>
+        </div>
+        <div id="query-div" style="margin-top: 10px">
+            <p style="margin: 0">Query:</p>
+            <textarea id="query" name="query" cols="70" rows="10" style="resize: none; margin-top: 5px"></textarea>
+        </div>
+        <div id="run-button-div" style="margin-top: 1px">
+            <button type="button" onclick="queryExecution()" style="display: inline-block; background: rgb(192, 255, 192); width: 30%;">Run</button>
+            <div style="float: right; display: inline-block">
+                <p style="display: inline-block; margin: 0">Time Elapsed: </p>
+                <p id="execution-time" style="display: inline-block; margin: 0">0.0 s</p>
+            </div>
+        </div>
+        <div id="result-div" style="margin-top: 5px">
+            <textarea id="result-area" name="result" cols="70" rows="10" style="resize: none; background: rgb(171, 171, 171)" readonly></textarea>
+        </div>
+    </form>
+</div>
+
+</body>
+</html>

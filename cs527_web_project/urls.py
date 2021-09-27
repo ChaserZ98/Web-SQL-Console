@@ -15,7 +15,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from project.views import index
+from project.views import ajax
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', index),
+    path('ajax_submit/', ajax)
 ]
