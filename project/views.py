@@ -25,7 +25,7 @@ def index(request):
 
 
 def connectToMySQL():
-    cursor = connections['mysql'].cursor()
+    cursor = connections['redshift'].cursor()
     cursor.execute('select database()')
     result = cursor.fetchone()[0]
     return result
