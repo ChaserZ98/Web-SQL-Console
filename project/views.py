@@ -25,8 +25,15 @@ def index(request):
 
 
 def connectToMySQL():
-    cursor = connections['redshift'].cursor()
+    cursor = connections['mysql'].cursor()
     cursor.execute('select database()')
+    result = cursor.fetchone()[0]
+    return result
+
+
+def connectToRedshift():
+    cursor = connections['redshift'].cursor()
+    cursor.execute('select current_database()')
     result = cursor.fetchone()[0]
     return result
 
@@ -47,25 +54,46 @@ def execute_sql(sql, conn):
 def ajax(request):
     databaseType = request.POST.get('databaseType')
     currentDatabase = request.POST.get('currentDatabase')
-    query = request.POST.get('query')
+    query = str(request.POST.get('query')).replace('\n', '')
+    query = [sql for sql in query.split(';') if sql]
+
     print('Received Query: ', query)
 
-    startTime = time.time()
+
+    resultAttribute = []
+    queryResult = []
+    influencedRowResult = []
+    totalTime = 0
     cursor = connections['mysql'].cursor()
-    influencedRow = cursor.execute(query)
-    endTime = time.time()
+    for sql in query:
+        startTime = time.time()
+        influencedRow = cursor.execute(sql)
+        endTime = time.time()
+        totalTime += endTime - startTime
+        if influencedRow == 0:
+            influencedRowResult.append(None)
+        elif influencedRow == 1:
+            temp = f"{influencedRow} row "
+            temp += "retrieved" if cursor.description else "affected"
+            influencedRowResult.append(temp)
+        else:
+            temp = f"{influencedRow} rows "
+            temp +=  "retrieved" if cursor.description else "affected"
+            influencedRowResult.append(temp)
+        queryResult.append(cursor.fetchall())
+        if cursor.description:
+            resultAttribute.append([attribute[0] for attribute in cursor.description])
+        else:
+            resultAttribute.append(None)
 
-    fetchResult = cursor.fetchall()
-
-    result = None
-    if influencedRow == 1:
-        result = "%d row retrieved\n" % influencedRow
-    else:
-        result = "%d rows retrieved\n" % influencedRow
-    result += str(fetchResult)
-    print('Result: ', result)
+    for i in range(len(influencedRowResult)):
+        print(f'Executed Query: {query[i]}')
+        print(influencedRowResult[i])
+        print(f'Result Attributes: {resultAttribute[i]}')
+        print(f'Query Result: {queryResult[i]}')
+        print()
 
     cursor.execute('select database()')
     currentDatabase = cursor.fetchone()[0]
-    return JsonResponse({'result': result, 'executionTime': str(round(endTime - startTime, 2)) + ' s',
+    return JsonResponse({'influencedRowResult': influencedRowResult, 'resultAttribute': resultAttribute,  'queryResult': queryResult, 'executionTime': str(round(totalTime, 2)) + ' s',
                          'currentDatabase': str(currentDatabase)})

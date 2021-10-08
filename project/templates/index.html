@@ -27,9 +27,14 @@
                     type: 'POST',
                     data: {'databaseType': databaseType, 'query': query, 'currentDatabase': currentDatabaseName.innerText},
                     success: function(arg){
-                        document.getElementById('result-area').value = arg['result'];
-                        document.getElementById('execution-time').innerText = arg['executionTime'];
-                        currentDatabaseName.innerText = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
+                        let influencedRowResult = arg['influencedRowResult'];
+                        let resultAttribute = arg['resultAttribute'];
+                        let queryResult = arg['queryResult'];
+                        let executionTime = arg['executionTime'];
+                        let currentDatabase = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
+                        document.getElementById('result-area').value = arg['queryResult'][0];
+                        document.getElementById('execution-time').innerText = executionTime;
+                        currentDatabaseName.innerText = currentDatabase;
                     }
                 });
         }
