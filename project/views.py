@@ -92,6 +92,7 @@ def ajax(request):
         print(f'Result Attributes: {resultAttribute[i]}')
         print(f'Query Result: {queryResult[i]}')
         print()
+    print(f'Total Execution Time: {round(totalTime, 2)} s')
 
     cursor.execute('select database()')
     currentDatabase = cursor.fetchone()[0]

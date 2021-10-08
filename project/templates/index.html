@@ -32,7 +32,7 @@
                         let queryResult = arg['queryResult'];
                         let executionTime = arg['executionTime'];
                         let currentDatabase = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
-                        document.getElementById('result-area').value = arg['queryResult'][0];
+                        document.getElementById('result-area').value = arg['queryResult'];
                         document.getElementById('execution-time').innerText = executionTime;
                         currentDatabaseName.innerText = currentDatabase;
                     }
