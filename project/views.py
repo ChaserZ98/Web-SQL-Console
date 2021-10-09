@@ -1,3 +1,5 @@
+import traceback
+
 from django.shortcuts import render
 # from django.http import HttpResponse
 from django.http import JsonResponse
@@ -24,27 +26,28 @@ def connectToDB(request):
     :return: schema/database name
     """
     databaseType = request.POST.get('databaseType')
-    cursor = connections[databaseType].cursor()
+    responseStatus = 0      # 0 for no error, 1 for error
+    cursor = None
+    try:
+        cursor = connections[databaseType].cursor()
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
     result = ''
-    if databaseType == 'mysql':
-        cursor.execute('select database()')
-        result = cursor.fetchone()[0]
-    elif databaseType == 'redshift':
-        cursor.execute('select current_database()')
-        result = cursor.fetchone()[0]
+    try:
+        if databaseType == 'mysql':
+            cursor.execute('select database()')
+            result = cursor.fetchone()[0]
+        elif databaseType == 'redshift':
+            cursor.execute('select current_database()')
+            result = cursor.fetchone()[0]
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+
     return JsonResponse({'currentDatabase': result})
-
-
-def execute_sql(sql, conn):
-    """
-    :param sql: sql query
-    :param conn: database connection instance
-    :return: query result
-    """
-    cursor = conn.cursor()
-    cursor.execute(sql)
-    result = cursor.fetchall()
-    return result
 
 
 # receive ajax request and return requested data
@@ -67,41 +70,89 @@ def ajax(request):
     totalTime = 0               # total time of executing all sql queries
     # currentDatabase           # return the current database/schema back in case it changed
 
-    cursor = connections[databaseType].cursor()
+    cursor = None
+    try:
+        cursor = connections[databaseType].cursor()
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+
     for sql in query:
         startTime = time.time()
-        influencedRow = cursor.execute(sql)
+        try:
+            cursor.execute(sql)
+        except Exception as e:
+            responseStatus = 1
+            traceback.print_exc()
+            return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
         endTime = time.time()
         totalTime += endTime - startTime
-        if influencedRow == 0 or influencedRow is None:
-            influencedRowResult.append(None)
-        elif influencedRow == 1:
-            temp = f"{influencedRow} row "
-            temp += "retrieved" if cursor.description else "affected"
-            influencedRowResult.append(temp)
-        else:
-            temp = f"{influencedRow} rows "
-            temp += "retrieved" if cursor.description else "affected"
-            influencedRowResult.append(temp)
-        queryResult.append(cursor.fetchall())
-        if cursor.description:
-            resultAttribute.append([attribute[0] for attribute in cursor.description])
-        else:
-            resultAttribute.append(None)
+        influencedRow = cursor.rowcount
+        # DML (INSERT, UPDATE) will use "affected", DQL (SELECT) will use "retrieved"
+        try:
+            if influencedRow == 0 or influencedRow == -1:
+                influencedRowResult.append(None)
+            elif influencedRow == 1:
+                temp = f"{influencedRow} row "
+                temp += "retrieved" if cursor.description else "affected"
+                influencedRowResult.append(temp)
+            else:
+                temp = f"{influencedRow} rows "
+                temp += "retrieved" if cursor.description else "affected"
+                influencedRowResult.append(temp)
+        except Exception as e:
+            responseStatus = 1
+            traceback.print_exc()
+            return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+        try:
+            if databaseType == 'mysql':
+                queryResult.append(cursor.fetchall())
+            elif databaseType == 'redshift':
+                # no result will be fetched if the last query is DML (INSERT, UPDATE)
+                if cursor.description:
+                    # if cursor.description is not None, then it means the last query is DQL (SELECT)
+                    queryResult.append(cursor.fetchall())
+                else:
+                    queryResult.append(())
+        except Exception as e:
+            responseStatus = 1
+            traceback.print_exc()
+            return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+        try:
+            if cursor.description:
+                resultAttribute.append([attribute[0] for attribute in cursor.description])
+            else:
+                resultAttribute.append(None)
+        except Exception as e:
+            responseStatus = 1
+            traceback.print_exc()
+            return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
 
-    for i in range(len(influencedRowResult)):
-        print(f'Executed Query: {query[i]}')
-        print(influencedRowResult[i])
-        print(f'Result Attributes: {resultAttribute[i]}')
-        print(f'Query Result: {queryResult[i]}')
-        print()
-    print(f'Total Execution Time: {round(totalTime, 2)} s')
+    try:
+        for i in range(len(influencedRowResult)):
+            print(f'Executed Query: {query[i]}')
+            print(influencedRowResult[i])
+            print(f'Result Attributes: {resultAttribute[i]}')
+            print(f'Query Result: {queryResult[i]}')
+            print()
+        print(f'Total Execution Time: {round(totalTime, 2)} s')
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
 
-    if databaseType == 'mysql':
-        cursor.execute('select database()')
-        currentDatabase = cursor.fetchone()[0]
-    elif databaseType == 'redshift':
-        cursor.execute('select current_database()')
-        currentDatabase = cursor.fetchone()[0]
+    try:
+        if databaseType == 'mysql':
+            cursor.execute('select database()')
+            currentDatabase = cursor.fetchone()[0]
+        elif databaseType == 'redshift':
+            cursor.execute('select current_database()')
+            currentDatabase = cursor.fetchone()[0]
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+
     return JsonResponse({'influencedRowResult': influencedRowResult, 'resultAttribute': resultAttribute,  'queryResult': queryResult, 'executionTime': str(round(totalTime, 2)) + ' s',
                          'currentDatabase': str(currentDatabase)})

@@ -20,6 +20,10 @@
                     break;
                 }
             }
+            if(!databaseType){
+                alert("You haven't connected to a database!\nPlease choose a database first!");
+                return;
+            }
             let currentDatabaseName = document.getElementById('current-database');      // selected database/schema
 
             $.ajax(
@@ -28,14 +32,20 @@
                     type: 'POST',
                     data: {'databaseType': databaseType, 'query': query, 'currentDatabase': currentDatabaseName.innerText},
                     success: function(arg){
-                        let influencedRowResult = arg['influencedRowResult'];
-                        let resultAttribute = arg['resultAttribute'];
-                        let queryResult = arg['queryResult'];
-                        let executionTime = arg['executionTime'];
-                        let currentDatabase = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
-                        document.getElementById('result-area').value = arg['queryResult'];
-                        document.getElementById('execution-time').innerText = executionTime;
-                        currentDatabaseName.innerText = currentDatabase;
+                        if(arg['responseStatus']){
+                            alert(arg['errorDetails'])
+                        }
+                        else{
+                            let influencedRowResult = arg['influencedRowResult'];
+                            let resultAttribute = arg['resultAttribute'];
+                            let queryResult = arg['queryResult'];
+                            let executionTime = arg['executionTime'];
+                            let currentDatabase = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
+                            // document.getElementById('result-area').value = arg['queryResult'];
+                            document.getElementById('result-area').value = formatOutput(influencedRowResult, resultAttribute, queryResult);
+                            document.getElementById('execution-time').innerText = executionTime;
+                            currentDatabaseName.innerText = currentDatabase;
+                        }
                     },
                     error: function(XMLHttpRequest, textStatus, errorThrown){
                         alert("Status: " + textStatus + "\nError: " + errorThrown)
@@ -58,8 +68,19 @@
                     type: 'POST',
                     data: {'databaseType': databaseType},
                     success: function(arg){
-                        alert('Switch to ' + databaseType + ' successfully!')
-                        currentDatabaseName.innerText = arg['currentDatabase']
+                        if(arg['responseStatus'] === 1){
+                            alert(arg['errorDetails'])
+                            for (let i = 0; i < databaseTypes.length; i++) {
+                                if(databaseTypes[i].checked){
+                                    databaseTypes[i].checked = false
+                                    break;
+                                }
+                            }
+                        }
+                        else{
+                            alert('Switch to ' + databaseType + ' successfully!')
+                            currentDatabaseName.innerText = arg['currentDatabase']
+                        }
                     },
                     error: function(XMLHttpRequest, textStatus, errorThrown){
                         alert("Status: " + textStatus + "\nError: " + errorThrown + '\nFailed to connect to ' + databaseType + '. Please try again.')
@@ -72,9 +93,27 @@
                     }
                 });
         }
+        function formatOutput(influencedRowResult, resultAttribute, queryResult){
+            let formatResult = "";
+            for(let i = 0; i < influencedRowResult.length; i++){
+                formatResult += influencedRowResult[i] + "\n"
+                for(let column in resultAttribute[i]){
+                    formatResult += resultAttribute[i][column] + "\t"
+                }
+                formatResult += "\n"
+                for(let row in queryResult[i]){
+                    for(let column in queryResult[i][row]){
+                        formatResult += queryResult[i][row][column] + "\t"
+                    }
+                    formatResult += "\n"
+                }
+                formatResult += "\n"
+            }
+            return formatResult
+        }
     </script>
 </head>
-<body>
+<body style="font-family: 'Cascadia Mono', serif;">
 <div style="margin: auto; width: fit-content">
     <form action="" method="post">
         <div id="database-div">
@@ -89,10 +128,10 @@
         </div>
         <div id="query-div" style="margin-top: 10px">
             <p style="margin: 0">Query:</p>
-            <label for="query"></label><textarea id="query" name="query" cols="45" rows="15" style="resize: none; margin-top: 5px; font-family: 'Cascadia Mono'; font-size: 14pt" spellcheck="false"></textarea>
+            <label for="query"></label><textarea id="query" name="query" cols="45" rows="15" style="resize: none; margin-top: 5px; font-family: 'Cascadia Mono', serif; font-size: 14pt" spellcheck="false"></textarea>
         </div>
         <div id="run-button-div" style="margin-top: 1px">
-            <button type="button" onclick="queryExecution()" style="display: inline-block; background: rgb(192, 255, 192); width: 30%;" accesskey="s">Run</button>
+            <button type="button" onclick="queryExecution()" style="display: inline-block; background: rgb(192, 255, 192); width: 30%; font-family: 'Cascadia Mono', serif;" accesskey="s">Run</button>
             <div style="float: right; display: inline-block">
                 <p style="display: inline-block; margin: 0">Time Elapsed: </p>
                 <p id="execution-time" style="display: inline-block; margin: 0">0.0 s</p>
