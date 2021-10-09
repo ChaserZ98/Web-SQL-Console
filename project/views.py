@@ -134,7 +134,7 @@ def ajax(request):
             print(f'Executed Query: {query[i]}')
             print(influencedRowResult[i])
             print(f'Result Attributes: {resultAttribute[i]}')
-            print(f'Query Result: {queryResult[i]}')
+            print(f'Query Result: {queryResult[i][:100]}')
             print()
         print(f'Total Execution Time: {round(totalTime, 2)} s')
     except Exception as e:
