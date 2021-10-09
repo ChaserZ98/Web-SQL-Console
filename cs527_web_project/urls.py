@@ -17,9 +17,11 @@ from django.contrib import admin
 from django.urls import path
 from project.views import index
 from project.views import ajax
+from project.views import connectToDB
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', index),
-    path('ajax_submit/', ajax)
+    path('query_submit/', ajax),
+    path('switch_database/', connectToDB)
 ]
