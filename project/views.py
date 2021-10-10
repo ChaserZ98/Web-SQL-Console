@@ -6,6 +6,7 @@ from django.http import JsonResponse
 # import mysql.connector as mysql
 import time
 from django.db import connections
+import re
 
 
 # def index(request):
@@ -50,6 +51,52 @@ def connectToDB(request):
     return JsonResponse({'currentDatabase': result})
 
 
+def checkQuery(query, row, rowPerPage):
+    # since show, describe doesn't support limit, then only when using select command will we append limit and offset
+    if str(query[:6]).lower() == 'select':
+        # In redshift (postgreSQL), top and limit is not allowed to use together.
+        top = re.search('\s+top\s+(\d+)', query, re.IGNORECASE)
+        limitOffset = re.search('\s+limit\s+(\d+)\s*,\s+(\d+)', query, re.IGNORECASE)
+        limit = re.search('\s+limit\s+(\d+)', query, re.IGNORECASE)
+        offset = re.search('\s+offset\s+(\d+)', query, re.IGNORECASE)
+        if top:
+            limitNum = int(top.group(1))
+            query = re.sub('(\s+top\s+\d+)', '', query, re.IGNORECASE)
+            if offset:
+                query = re.sub('(\s+offset\s+\d+)', '', query, re.IGNORECASE)
+                offsetNum = int(offset.group(1))
+            if rowPerPage + row > limitNum:
+                query += " limit %s offset %s" % (limitNum - row, row if not offset else row + offsetNum)
+            else:
+                query += " limit %s offset %s" % (rowPerPage, row if not offset else row + offsetNum)
+        elif limitOffset:
+            offsetNum = int(limitOffset.group(1))
+            limitNum = int(limitOffset.group(2))
+            query = re.sub('(\s+limit\s+\d+\s*,\s+\d+)', '', query, re.IGNORECASE)
+            if rowPerPage + row > limitNum:
+                query += " limit %s offset %s" % (limitNum - row, row + offsetNum)
+            else:
+                query += " limit %s offset %s" % (rowPerPage, row + offsetNum)
+        elif limit:
+            limitNum = int(limit.group(1))
+            query = re.sub('(\s+limit\s+\d+)', '', query, re.IGNORECASE)
+            if offset:
+                query = re.sub('(\s+offset\s+\d+)', '', query, re.IGNORECASE)
+                offsetNum = int(offset.group(1))
+            if rowPerPage + row > limitNum:
+                query += " limit %s offset %s" % (limitNum - row, row if not offset else row + offsetNum)
+            else:
+                query += " limit %s offset %s" % (rowPerPage, row if not offset else row + offsetNum)
+        elif offset:
+            query = re.sub('(\s+offset\s+\d+)', '', query, re.IGNORECASE)
+            offsetNum = int(offset.group(1))
+            row += offsetNum
+            query += " limit %s offset %s" % (rowPerPage, row)
+        else:
+            query += " limit %s offset %s" % (rowPerPage, row)
+    return query
+
+
 def updateData(request):
     databaseType = request.POST.get('databaseType')
     draw = request.POST.get('draw')
@@ -57,8 +104,18 @@ def updateData(request):
     rowPerPage = int(request.POST.get('length'))
     attribute = request.POST.getlist('attribute[]')
     query = request.POST.get('query')
-    query += " limit %s offset %s" % (rowPerPage, row)
     totalRecords = request.POST.get('totalRecords')
+    print(f"row: {row}")
+    print(f"rowPerPage: {rowPerPage}")
+
+    try:
+        query = checkQuery(query, row, rowPerPage)
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+
+    print(f"Executed Query: {query}")
 
     try:
         cursor = connections[databaseType].cursor()
@@ -72,13 +129,16 @@ def updateData(request):
         traceback.print_exc()
         return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
 
-    print(f"Executed Query: {query}")
     print(f"draw: {draw}")
     print(f"recordsTotal: {totalRecords}")
     print(f"recordsFiltered: {totalRecords}")
     print(f"data: {data}")
 
-    return JsonResponse({'draw': draw, 'recordsTotal': totalRecords, 'recordsFiltered': totalRecords, 'data': data})
+    return JsonResponse({
+        'draw': draw,
+        'recordsTotal': totalRecords,
+        'recordsFiltered': totalRecords,
+        'data': data})
 
 
 # receive ajax request and return requested data
@@ -188,5 +248,11 @@ def ajax(request):
         traceback.print_exc()
         return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
 
-    return JsonResponse({'tableQuery': tableQuery, 'totalRecords': totalRecords, 'influencedRowResult': influencedRowResult, 'resultAttribute': resultAttribute,  'queryResult': queryResult, 'executionTime': str(round(totalTime, 2)) + ' s',
-                         'currentDatabase': str(currentDatabase)})
+    return JsonResponse(
+        {'tableQuery': tableQuery,
+         'totalRecords': totalRecords,
+         'influencedRowResult': influencedRowResult,
+         'resultAttribute': resultAttribute,
+         'queryResult': queryResult,
+         'executionTime': str(round(totalTime, 2)) + ' s',
+         'currentDatabase': str(currentDatabase)})
