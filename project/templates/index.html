@@ -25,13 +25,16 @@
         function queryExecution(){
             let resultTableDiv = document.getElementById('result-table-div');
             resultTableDiv.innerHTML = '';
+            document.getElementById('execution-time').innerText = "∞ s";
             query = document.getElementById('query').value;     // input query
             if(query.length == 0){
                 alert("Empty Query!");
+                document.getElementById('execution-time').innerText = "0.0 s";
                 return;
             }
             if(!databaseType){
                 alert("You haven't connected to a database!\nPlease choose a database first!");
+                document.getElementById('execution-time').innerText = "0.0 s";
                 return;
             }
             currentDatabaseName = document.getElementById('current-database');      // selected database/schema
@@ -44,7 +47,8 @@
                     data: {'databaseType': databaseType, 'query': query, 'currentDatabase': currentDatabaseName.innerText},
                     success: function(arg){
                         if(arg['responseStatus']){
-                            alert(arg['errorDetails'])
+                            document.getElementById('execution-time').innerText = "0.0 s";
+                            alert(arg['errorDetails']);
                         }
                         else{
                             tableQuery = arg['tableQuery'];
@@ -89,7 +93,8 @@
                         }
                     },
                     error: function(XMLHttpRequest, textStatus, errorThrown){
-                        alert("Status: " + textStatus + "\nError: " + errorThrown)
+                        document.getElementById('execution-time').innerText = "0.0 s";
+                        alert("Status: " + textStatus + "\nError: " + errorThrown);
                     }
                 });
         }
@@ -109,7 +114,7 @@
                         else{
                             alert('Switch to ' + databaseType + ' successfully!');
                             currentDatabaseName.innerText = arg['currentDatabase'];
-                            document.getElementById('execution-time').innerText = "0.00 s";
+                            document.getElementById('execution-time').innerText = "0.0 s";
                             document.getElementById('result-table-div').innerHTML = '';
                             document.getElementById('query').value = '';
                         }
