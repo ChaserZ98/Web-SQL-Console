@@ -39,6 +39,7 @@
             $.ajax(
                 {
                     url:'query_submit/',
+                    timeout: 300,
                     type: 'POST',
                     data: {'databaseType': databaseType, 'query': query, 'currentDatabase': currentDatabaseName.innerText},
                     success: function(arg){
@@ -148,6 +149,7 @@
                     'serverSide': true,
                     'serverMethod': 'post',
                     'ajax': {
+                        timeout: 300,
                         'url': 'update_data/',
                         'type': 'POST',
                         'data': {
