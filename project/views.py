@@ -50,6 +50,37 @@ def connectToDB(request):
     return JsonResponse({'currentDatabase': result})
 
 
+def updateData(request):
+    databaseType = request.POST.get('databaseType')
+    draw = request.POST.get('draw')
+    row = int(request.POST.get('start'))
+    rowPerPage = int(request.POST.get('length'))
+    attribute = request.POST.getlist('attribute[]')
+    query = request.POST.get('query')
+    query += " limit %s offset %s" % (rowPerPage, row)
+    totalRecords = request.POST.get('totalRecords')
+
+    try:
+        cursor = connections[databaseType].cursor()
+        recordsFiltered = cursor.execute(query)
+        result = cursor.fetchall()
+        data = []
+        for row in result:
+            data.append({"\'" + attribute[i] + "\'": str(row[i]) for i in range(len(attribute))})
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+
+    print(f"Executed Query: {query}")
+    print(f"draw: {draw}")
+    print(f"recordsTotal: {totalRecords}")
+    print(f"recordsFiltered: {totalRecords}")
+    print(f"data: {data}")
+
+    return JsonResponse({'draw': draw, 'recordsTotal': totalRecords, 'recordsFiltered': totalRecords, 'data': data})
+
+
 # receive ajax request and return requested data
 def ajax(request):
     """
@@ -64,9 +95,11 @@ def ajax(request):
     print('Received Query: ', query)
 
     # send data
+    tableQuery = query          # query that generates each table
     resultAttribute = []        # table attribute
     queryResult = []            # table data
-    influencedRowResult = []    # number of rows influenced by a sql query
+    totalRecords = []           # numeric value of number of rows influenced by a sql query
+    influencedRowResult = []    # string value of number of rows influenced by a sql query
     totalTime = 0               # total time of executing all sql queries
     # currentDatabase           # return the current database/schema back in case it changed
 
@@ -89,6 +122,7 @@ def ajax(request):
         endTime = time.time()
         totalTime += endTime - startTime
         influencedRow = cursor.rowcount
+        totalRecords.append(influencedRow)
         # DML (INSERT, UPDATE) will use "affected", DQL (SELECT) will use "retrieved"
         try:
             if influencedRow == 0 or influencedRow == -1:
@@ -107,12 +141,12 @@ def ajax(request):
             return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
         try:
             if databaseType == 'mysql':
-                queryResult.append(cursor.fetchall())
+                queryResult.append(cursor.fetchmany(size=100))
             elif databaseType == 'redshift':
                 # no result will be fetched if the last query is DML (INSERT, UPDATE)
                 if cursor.description:
                     # if cursor.description is not None, then it means the last query is DQL (SELECT)
-                    queryResult.append(cursor.fetchall())
+                    queryResult.append(cursor.fetchmany(size=100))
                 else:
                     queryResult.append(())
         except Exception as e:
@@ -134,7 +168,7 @@ def ajax(request):
             print(f'Executed Query: {query[i]}')
             print(influencedRowResult[i])
             print(f'Result Attributes: {resultAttribute[i]}')
-            print(f'Query Result: {queryResult[i][:100]}')
+            print(f'Query Result: {queryResult[i][:100]}')  # limit query result to 100 rows
             print()
         print(f'Total Execution Time: {round(totalTime, 2)} s')
     except Exception as e:
@@ -154,5 +188,5 @@ def ajax(request):
         traceback.print_exc()
         return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
 
-    return JsonResponse({'influencedRowResult': influencedRowResult, 'resultAttribute': resultAttribute,  'queryResult': queryResult, 'executionTime': str(round(totalTime, 2)) + ' s',
+    return JsonResponse({'tableQuery': tableQuery, 'totalRecords': totalRecords, 'influencedRowResult': influencedRowResult, 'resultAttribute': resultAttribute,  'queryResult': queryResult, 'executionTime': str(round(totalTime, 2)) + ' s',
                          'currentDatabase': str(currentDatabase)})

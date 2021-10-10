@@ -4,27 +4,37 @@
     <meta charset="UTF-8">
     <title>CS 527 Project</title>
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+    <link href='https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css' rel='stylesheet' type='text/css'>
+    <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
     <script>
+        // user input value
+        let query;                  // input query
+        let databaseType;           // connected database
+        let currentDatabaseName;    // used schema/database
+
+        // server returned value
+        let tableQuery;             // query of each generated table
+        let totalRecords;           // numeric value of number of rows affected/retrieved
+        let influencedRowResult;    // string value of number of rows affected/retrieved
+        let resultAttribute;        // table attribute
+        let queryResult;            // table data
+        let executionTime;          // total time of executing all sql queries
+
+        let resultTables = document.getElementsByTagName('resultTable');
+
         function queryExecution(){
-            let query = document.getElementById('query').value;     // input query
+            let resultTableDiv = document.getElementById('result-table-div');
+            resultTableDiv.innerHTML = '';
+            query = document.getElementById('query').value;     // input query
             if(query.length == 0){
                 alert("Empty Query!");
                 return;
-            }
-
-            let databaseTypes = document.getElementsByName('database');     // databases list
-            let databaseType;   //mysql or redshift or mongodb
-            for (let i = 0; i < databaseTypes.length; i++) {
-                if(databaseTypes[i].checked){
-                    databaseType = databaseTypes[i].value
-                    break;
-                }
             }
             if(!databaseType){
                 alert("You haven't connected to a database!\nPlease choose a database first!");
                 return;
             }
-            let currentDatabaseName = document.getElementById('current-database');      // selected database/schema
+            currentDatabaseName = document.getElementById('current-database');      // selected database/schema
 
             $.ajax(
                 {
@@ -36,15 +46,45 @@
                             alert(arg['errorDetails'])
                         }
                         else{
-                            let influencedRowResult = arg['influencedRowResult'];
-                            let resultAttribute = arg['resultAttribute'];
-                            let queryResult = arg['queryResult'];
-                            let executionTime = arg['executionTime'];
-                            let currentDatabase = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
-                            // document.getElementById('result-area').value = arg['queryResult'];
-                            document.getElementById('result-area').value = formatOutput(influencedRowResult, resultAttribute, queryResult);
+                            tableQuery = arg['tableQuery'];
+                            totalRecords = arg['totalRecords'];
+                            influencedRowResult = arg['influencedRowResult'];
+                            resultAttribute = arg['resultAttribute'];
+                            queryResult = arg['queryResult'];
+                            executionTime = arg['executionTime'];
+                            currentDatabase = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
+                            // document.getElementById('result-area').value = formatOutput(influencedRowResult, resultAttribute, queryResult);
                             document.getElementById('execution-time').innerText = executionTime;
                             currentDatabaseName.innerText = currentDatabase;
+
+                            for(let i in tableQuery){
+                                if(resultAttribute[i]){
+                                    let table = document.createElement('table');
+                                    table.id = "resultTable" + i;
+                                    table.className = "cell-border compact display dataTable hover";
+                                    table.width = '100%';
+                                    let caption = document.createElement('caption');
+                                    caption.innerText = tableQuery[i].toString() + "\n(" + influencedRowResult[i] + ")";
+                                    table.appendChild(caption);
+                                    let thead = document.createElement('thead');
+                                    let tr = document.createElement('tr');
+                                    for(let j in resultAttribute[i]){
+                                        let th = document.createElement('th')
+                                        th.innerText = resultAttribute[i][j];
+                                        tr.appendChild(th);
+                                    }
+                                    thead.appendChild(tr);
+                                    table.appendChild(thead);
+                                    resultTableDiv.appendChild(table);
+                                    updateData(databaseType, resultAttribute[i], table, tableQuery[i], totalRecords[i]);
+                                }
+                                else{
+                                    let p = document.createElement('p');
+                                    p.id = 'result' + i;
+                                    p.innerText = tableQuery[i] + " → " + (influencedRowResult[i] ? influencedRowResult[i] : "complete");
+                                    resultTableDiv.appendChild(p);
+                                }
+                            }
                         }
                     },
                     error: function(XMLHttpRequest, textStatus, errorThrown){
@@ -52,16 +92,9 @@
                     }
                 });
         }
-        function switchDatabase(){
-            let databaseTypes = document.getElementsByName('database');     // databases list
-            let databaseType;   //mysql or redshift or mongodb
-            for (let i = 0; i < databaseTypes.length; i++) {
-                if(databaseTypes[i].checked){
-                    databaseType = databaseTypes[i].value
-                    break;
-                }
-            }
-            let currentDatabaseName = document.getElementById('current-database');
+        function switchDatabase(clickedRadio){
+            databaseType = clickedRadio.value;
+            currentDatabaseName = document.getElementById('current-database');
             $.ajax(
                 {
                     url:'switch_database/',
@@ -69,27 +102,20 @@
                     data: {'databaseType': databaseType},
                     success: function(arg){
                         if(arg['responseStatus'] === 1){
-                            alert(arg['errorDetails'])
-                            for (let i = 0; i < databaseTypes.length; i++) {
-                                if(databaseTypes[i].checked){
-                                    databaseTypes[i].checked = false
-                                    break;
-                                }
-                            }
+                            alert(arg['errorDetails']);
+                            clickedRadio.checked = false;
                         }
                         else{
-                            alert('Switch to ' + databaseType + ' successfully!')
-                            currentDatabaseName.innerText = arg['currentDatabase']
+                            alert('Switch to ' + databaseType + ' successfully!');
+                            currentDatabaseName.innerText = arg['currentDatabase'];
+                            document.getElementById('execution-time').innerText = "0.00 s";
+                            document.getElementById('result-table-div').innerHTML = '';
+                            document.getElementById('query').value = '';
                         }
                     },
                     error: function(XMLHttpRequest, textStatus, errorThrown){
                         alert("Status: " + textStatus + "\nError: " + errorThrown + '\nFailed to connect to ' + databaseType + '. Please try again.')
-                        for (let i = 0; i < databaseTypes.length; i++) {
-                            if(databaseTypes[i].checked){
-                                databaseTypes[i].checked = false
-                                break;
-                            }
-                        }
+                        clickedRadio.checked = false;
                     }
                 });
         }
@@ -111,6 +137,36 @@
             }
             return formatResult
         }
+        function updateData(databaseType, attribute, resultTable, query, totalRecords){
+            let columns = [];
+            for(let i in attribute){
+                columns.push({data: "\'" + attribute[i] + "\'"});
+            }
+            // console.log(columns);
+            $("#" + resultTable.id).DataTable({
+                    'processing': true,
+                    'serverSide': true,
+                    'serverMethod': 'post',
+                    'ajax': {
+                        'url': 'update_data/',
+                        'type': 'POST',
+                        'data': {
+                            'databaseType': databaseType,
+                            totalRecords: totalRecords,
+                            'query': query,
+                            'attribute[]': attribute
+                        },
+                        'error':
+                            function(XMLHttpRequest, textStatus, errorThrown){
+                                alert("Status: " + textStatus + "\nError: " + errorThrown)
+                            }
+                    },
+                    'lengthMenu': [[10, 25, 50], [10, 25, 50]],
+                    searching: false,
+                    sort: false,
+                    'columns':columns
+                });
+        }
     </script>
 </head>
 <body style="font-family: 'Cascadia Mono', serif;">
@@ -122,8 +178,8 @@
                 <p id="current-database" style="display: inline-block; margin: 0;"></p>
             </div>
             <label style="margin-left: 10%">
-                <input type="radio" name="database" value="mysql" onclick="switchDatabase()">MySQL
-                <input type="radio" name="database" value="redshift" style="margin-left: 10%" onclick="switchDatabase()">Redshift
+                <input type="radio" name="database" value="mysql" onclick="switchDatabase(this)">MySQL
+                <input type="radio" name="database" value="redshift" style="margin-left: 10%" onclick="switchDatabase(this)">Redshift
             </label>
         </div>
         <div id="query-div" style="margin-top: 10px">
@@ -137,11 +193,12 @@
                 <p id="execution-time" style="display: inline-block; margin: 0">0.0 s</p>
             </div>
         </div>
-        <div id="result-div" style="margin-top: 5px">
-            <textarea id="result-area" name="result" cols="70" rows="10" style="resize: none; background: rgb(171, 171, 171)" readonly spellcheck="false"></textarea>
-        </div>
+<!--        <div id="result-div" style="margin-top: 5px">-->
+<!--            <textarea id="result-area" name="result" cols="70" rows="10" style="resize: none; background: rgb(171, 171, 171)" readonly spellcheck="false"></textarea>-->
+<!--        </div>-->
     </form>
 </div>
+<div id="result-table-div" style="margin: auto; width: fit-content" ></div>
 
 </body>
 </html>
