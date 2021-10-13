@@ -150,7 +150,7 @@ def ajax(request):
     # received data
     databaseType = request.POST.get('databaseType')     # mysql/redshift/mongoDB
     currentDatabase = request.POST.get('currentDatabase')   # used database/schema
-    query = str(request.POST.get('query')).replace('\n', '')    # input sql query
+    query = str(request.POST.get('query')).replace('\n', ' ')    # input sql query
     query = [sql for sql in query.split(';') if sql]
     print('Received Query: ', query)
 
