@@ -7,7 +7,7 @@ from django.http import JsonResponse
 import time
 from django.db import connections
 import re
-
+from project import mongoClient
 
 # def index(request):
 #     return HttpResponse('project index page')
@@ -27,10 +27,14 @@ def connectToDB(request):
     :return: schema/database name
     """
     databaseType = request.POST.get('databaseType')
-    responseStatus = 0      # 0 for no error, 1 for error
+    responseStatus = 0  # 0 for no error, 1 for error
     cursor = None
+    db = None
     try:
-        cursor = connections[databaseType].cursor()
+        if databaseType == "mongodb":
+            db = mongoClient["instacart"]
+        else:
+            cursor = connections[databaseType].cursor()
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
@@ -43,6 +47,8 @@ def connectToDB(request):
         elif databaseType == 'redshift':
             cursor.execute('select current_database()')
             result = cursor.fetchone()[0]
+        elif databaseType == 'mongodb':
+            result = db.name
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
@@ -148,24 +154,28 @@ def ajax(request):
     :return: json response including query result
     """
     # received data
-    databaseType = request.POST.get('databaseType')     # mysql/redshift/mongoDB
-    currentDatabase = request.POST.get('currentDatabase')   # used database/schema
-    query = str(request.POST.get('query'))    # input sql query
+    databaseType = request.POST.get('databaseType')  # mysql/redshift/mongoDB
+    currentDatabase = request.POST.get('currentDatabase')  # used database/schema
+    query = str(request.POST.get('query'))  # input sql query
     query = [sql.replace('\n', ' ').strip() for sql in query.split(';') if sql]
     print('Received Query: ', query)
 
     # send data
-    tableQuery = query          # query that generates each table
-    resultAttribute = []        # table attribute
-    queryResult = []            # table data
-    totalRecords = []           # numeric value of number of rows influenced by a sql query
-    influencedRowResult = []    # string value of number of rows influenced by a sql query
-    totalTime = 0               # total time of executing all sql queries
+    tableQuery = query  # query that generates each table
+    resultAttribute = []  # table attribute
+    queryResult = []  # table data
+    totalRecords = []  # numeric value of number of rows influenced by a sql query
+    influencedRowResult = []  # string value of number of rows influenced by a sql query
+    totalTime = 0  # total time of executing all sql queries
     # currentDatabase           # return the current database/schema back in case it changed
 
     cursor = None
+    db = None
     try:
-        cursor = connections[databaseType].cursor()
+        if databaseType == 'mongodb':
+            db = mongoClient[currentDatabase]
+        else:
+            cursor = connections[databaseType].cursor()
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
@@ -256,3 +266,29 @@ def ajax(request):
          'queryResult': queryResult,
          'executionTime': str(round(totalTime, 2)) + ' s',
          'currentDatabase': str(currentDatabase)})
+
+
+def testMongo(request):
+    databaseType = request.POST.get('databaseType')
+    responseStatus = 0  # 0 for no error, 1 for error
+    db = None
+    try:
+        db = mongoClient["instacart"]
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+    result = ''
+    query = "db[\"instacart_fact_table\"].find().limit(1)"
+    cur = eval(query)
+    # cur = db["instacart_fact_table"].find().limit(1)
+    for doc in cur:
+        print(doc)
+    try:
+        result = db.name
+    except Exception as e:
+        responseStatus = 1
+        traceback.print_exc()
+        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
+
+    return JsonResponse({'currentDatabase': result})
