@@ -216,7 +216,7 @@ def ajax(request):
             keywordColor = "rgb(43, 51, 179)"
             identifierColor = "rgb(134, 179, 0)"
             for token in sqlparse.parse(sql)[0].flatten():
-                if token.ttype in sqlparse.tokens.Keyword:
+                if token.ttype in sqlparse.tokens.Keyword or token.ttype in sqlparse.tokens.Punctuation:
                     colorQuery += f"<span style='color: {keywordColor}'>{token.value}</span>"
                 elif token.ttype in sqlparse.tokens.Name or token.ttype in sqlparse.tokens.Wildcard:
                     colorQuery += f"<span style='color: {identifierColor}'>{token.value}</span>"
