@@ -14,11 +14,14 @@
 
         // server returned value
         let tableQuery;             // query of each generated table
+        let displayedQuery;         // query that will be displayed in result section
         let totalRecords;           // numeric value of number of rows affected/retrieved
         let influencedRowResult;    // string value of number of rows affected/retrieved
+        let executedTimeStamp;      // string value of timestamp when each query is executed
         let resultAttribute;        // table attribute
         let queryResult;            // table data
-        let executionTime;          // total time of executing all sql queries
+        let executionTime;          // string value of execution time of each query
+        let totalExecutionTime;     // total time of executing all sql queries
 
         let resultTables = document.getElementsByTagName('resultTable');
 
@@ -52,24 +55,38 @@
                         }
                         else{
                             tableQuery = arg['tableQuery'];
+                            displayedQuery = arg['displayedQuery'];
                             totalRecords = arg['totalRecords'];
+                            executedTimeStamp = arg['executedTimeStamp']
                             influencedRowResult = arg['influencedRowResult'];
                             resultAttribute = arg['resultAttribute'];
                             queryResult = arg['queryResult'];
                             executionTime = arg['executionTime'];
+                            totalExecutionTime = arg['totalExecutionTime'];
                             currentDatabase = arg['currentDatabase'] === "None" ? '' : arg['currentDatabase'];
                             // document.getElementById('result-area').value = formatOutput(influencedRowResult, resultAttribute, queryResult);
-                            document.getElementById('execution-time').innerText = executionTime;
+                            document.getElementById('execution-time').innerText = totalExecutionTime;
                             currentDatabaseName.innerText = currentDatabase;
 
                             for(let i in tableQuery){
+
+                                let p = document.createElement('p');
+                                p.id = 'result' + i;
+                                p.innerHTML =  "<span style='color: green'>" + currentDatabaseName.innerText + " ></span></br>" +
+                                    displayedQuery[i] + "</br>" +
+                                    "[" + executedTimeStamp[i] + "] " +
+                                    (influencedRowResult[i] ? influencedRowResult[i] : "completed") +
+                                    " in " + executionTime[i];
+                                resultTableDiv.appendChild(p);
+
                                 if(resultAttribute[i]){
                                     let table = document.createElement('table');
                                     table.id = "resultTable" + i;
                                     table.className = "cell-border compact display dataTable hover";
                                     table.width = '100%';
                                     let caption = document.createElement('caption');
-                                    caption.innerText = tableQuery[i].toString() + "\n(" + influencedRowResult[i] + ")";
+                                    // caption.innerText = tableQuery[i].toString() + "\n(" + influencedRowResult[i] + ")";
+                                    caption.innerText = tableQuery[i].toString();
                                     table.appendChild(caption);
                                     let thead = document.createElement('thead');
                                     let tr = document.createElement('tr');
@@ -82,12 +99,6 @@
                                     table.appendChild(thead);
                                     resultTableDiv.appendChild(table);
                                     updateData(databaseType, resultAttribute[i], table, tableQuery[i], totalRecords[i]);
-                                }
-                                else{
-                                    let p = document.createElement('p');
-                                    p.id = 'result' + i;
-                                    p.innerText = tableQuery[i] + " → " + (influencedRowResult[i] ? influencedRowResult[i] : "complete");
-                                    resultTableDiv.appendChild(p);
                                 }
                             }
                         }
@@ -120,7 +131,9 @@
                         }
                     },
                     error: function(XMLHttpRequest, textStatus, errorThrown){
-                        alert("Status: " + textStatus + "\nError: " + errorThrown + '\nFailed to connect to ' + databaseType + '. Please try again.')
+                        alert("Status: " + textStatus + "\n" +
+                            "Error: " + errorThrown + '\n' +
+                            'Failed to connect to ' + databaseType + '. Please try again.')
                         clickedRadio.checked = false;
                     }
                 });
@@ -201,9 +214,6 @@
                 <p id="execution-time" style="display: inline-block; margin: 0">0.0 s</p>
             </div>
         </div>
-<!--        <div id="result-div" style="margin-top: 5px">-->
-<!--            <textarea id="result-area" name="result" cols="70" rows="10" style="resize: none; background: rgb(171, 171, 171)" readonly spellcheck="false"></textarea>-->
-<!--        </div>-->
     </form>
 </div>
 <div id="result-table-div" style="margin: auto; width: fit-content" ></div>
