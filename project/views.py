@@ -143,23 +143,36 @@ def updateData(request):
     print(f"Executed Query: {query}")
 
     try:
+        # if databaseType == 'mysql':
         cursor = connections[databaseType].cursor()
         recordsFiltered = cursor.execute(query)
 
-        for i in range(resultIndex):
-            cursor.nextset()
+        if databaseType == 'mysql':
+            for i in range(resultIndex):
+                cursor.nextset()
 
         if isSelect:
             result = cursor.fetchall()
         else:
             for i in range(row//rowPerPage):
                 cursor.fetchmany(size=rowPerPage)
-
             result = cursor.fetchmany(size=rowPerPage)
 
         data = []
         for row in result:
             data.append({"\'" + attribute[i] + "\'": str(row[i]) for i in range(len(attribute))})
+        # elif databaseType == 'redshift':
+        #     cursor = connections[databaseType].cursor()
+        #     recordsFiltered = cursor.execute(query)
+        #     if isSelect:
+        #         result = cursor.fetchall()
+        #     else:
+        #         for i in range(row//rowPerPage):
+        #             cursor.fetchmany(size=rowPerPage)
+        #         result = cursor.fetchmany(size=rowPerPage)
+        #     data = []
+        #     for row in result:
+        #         data.append({"\'" + attribute[i] + "\'": str(row[i]) for i in range(len(attribute))})
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
@@ -234,9 +247,10 @@ def ajax(request):
 
         influencedRow.append(cursor.rowcount)
         cursorDescription.append(cursor.description)
-        while cursor.nextset():
-            influencedRow.append(cursor.rowcount)
-            cursorDescription.append(cursor.description)
+        if databaseType == 'mysql':
+            while cursor.nextset():
+                influencedRow.append(cursor.rowcount)
+                cursorDescription.append(cursor.description)
 
         totalRecords.append(influencedRow)
         executedTimeStamp.append(datetime.now().strftime("%m/%d/%Y %H:%M:%S"))
