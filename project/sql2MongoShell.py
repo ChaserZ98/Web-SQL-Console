@@ -419,5 +419,5 @@ if __name__ == '__main__':
     # print()
     print(tokens)
     print()
-    sql2Mongo(tokens)
+    sql2MongoShell(tokens)
     print(f"SQL: {sql}")
