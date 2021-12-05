@@ -79,26 +79,27 @@
                                     " in " + executionTime[i];
                                 resultTableDiv.appendChild(p);
 
-                                if(resultAttribute[i]){
-                                    let table = document.createElement('table');
-                                    table.id = "resultTable" + i;
-                                    table.className = "cell-border compact display dataTable hover";
-                                    table.width = '100%';
-                                    let caption = document.createElement('caption');
-                                    // caption.innerText = tableQuery[i].toString() + "\n(" + influencedRowResult[i] + ")";
-                                    caption.innerText = tableQuery[i].toString();
-                                    table.appendChild(caption);
-                                    let thead = document.createElement('thead');
-                                    let tr = document.createElement('tr');
-                                    for(let j in resultAttribute[i]){
-                                        let th = document.createElement('th')
-                                        th.innerText = resultAttribute[i][j];
-                                        tr.appendChild(th);
+                                for(let j in resultAttribute[i]){
+                                    if(resultAttribute[i][j]){
+                                        let table = document.createElement('table');
+                                        table.id = "resultTable_" + i + "_" + j;
+                                        table.className = "cell-border compact display dataTable hover";
+                                        table.width = '100%';
+                                        let caption = document.createElement('caption');
+                                        caption.innerText = tableQuery[i].toString();
+                                        table.appendChild(caption);
+                                        let thead = document.createElement('thead');
+                                        let tr = document.createElement('tr');
+                                        for(let k in resultAttribute[i][j]){
+                                            let th = document.createElement('th')
+                                            th.innerText = resultAttribute[i][j][k];
+                                            tr.appendChild(th);
+                                        }
+                                        thead.appendChild(tr);
+                                        table.appendChild(thead);
+                                        resultTableDiv.appendChild(table);
+                                        updateData(databaseType, resultAttribute[i][j], table, tableQuery[i], totalRecords[i][j], j);
                                     }
-                                    thead.appendChild(tr);
-                                    table.appendChild(thead);
-                                    resultTableDiv.appendChild(table);
-                                    updateData(databaseType, resultAttribute[i], table, tableQuery[i], totalRecords[i]);
                                 }
                             }
                         }
@@ -156,7 +157,7 @@
             }
             return formatResult
         }
-        function updateData(databaseType, attribute, resultTable, query, totalRecords){
+        function updateData(databaseType, attribute, resultTable, query, totalRecords, resultIndex){
             let columns = [];
             for(let i in attribute){
                 columns.push({data: "\'" + attribute[i] + "\'"});
@@ -174,7 +175,8 @@
                             'databaseType': databaseType,
                             totalRecords: totalRecords,
                             'query': query,
-                            'attribute[]': attribute
+                            'attribute[]': attribute,
+                            'resultIndex': resultIndex
                         },
                         'error':
                             function(XMLHttpRequest, textStatus, errorThrown){

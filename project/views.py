@@ -1,6 +1,5 @@
 import traceback
 
-import sqlparse
 from django.shortcuts import render
 # from django.http import HttpResponse
 from django.http import JsonResponse
@@ -10,6 +9,7 @@ from django.db import connections
 import re
 from project import mongoClient
 from datetime import datetime
+import sqlparse
 
 # def index(request):
 #     return HttpResponse('project index page')
@@ -52,7 +52,16 @@ def connectToDB(request):
             result = cursor.fetchone()[0]
         elif databaseType == 'mongodb':
             result = db.name
-            # temp = eval("db.instacart_fact_table.find().limit(1)")
+            # pipeline = [
+            #     {'$group': {'_id': None,
+            #                 'sum(product_id)': {'$sum': '$product_id'},
+            #                 'avg(product_id)': {'$avg': '$product_id'}}},
+            #     {'$project': {'b': '$sum(product_id)',
+            #                   '_id': 0,
+            #                   'c': '$avg(product_id)'}},
+            #     {'$limit': 10}
+            # ]
+            # temp = eval(f"db.instacart_fact_table.aggregate({pipeline}, allowDiskUse=True)")
             # for doc in temp:
             #     print(doc)
     except Exception as e:
@@ -64,8 +73,10 @@ def connectToDB(request):
 
 
 def checkQuery(query, row, rowPerPage):
+    isSelect = False
     # since show, describe doesn't support limit, then only when using select command will we append limit and offset
     if str(query[:6]).lower() == 'select':
+        isSelect = True
         # In redshift (postgreSQL), top and limit is not allowed to use together.
         query = query.replace(';', '')
         top = re.search('\s+top\s+(\d+)', query, flags=re.IGNORECASE)
@@ -107,22 +118,23 @@ def checkQuery(query, row, rowPerPage):
             query += " limit %s offset %s" % (rowPerPage, row)
         else:
             query += " limit %s offset %s" % (rowPerPage, row)
-    return query
+    return query, isSelect
 
 
 def updateData(request):
-    databaseType = request.POST.get('databaseType')
-    draw = request.POST.get('draw')
-    row = int(request.POST.get('start'))
-    rowPerPage = int(request.POST.get('length'))
-    attribute = request.POST.getlist('attribute[]')
-    query = request.POST.get('query')
-    totalRecords = request.POST.get('totalRecords')
+    databaseType = request.POST.get('databaseType')         # mysql/redshift/mongoDB
+    draw = request.POST.get('draw')                         # number of call
+    row = int(request.POST.get('start'))                    # number of records before this page
+    rowPerPage = int(request.POST.get('length'))            # number of records displayed in a page
+    attribute = request.POST.getlist('attribute[]')         # attribute list of a table
+    resultIndex = int(request.POST.get('resultIndex'))      # index of the table in a query result
+    query = request.POST.get('query')                       # executed query for the table
+    totalRecords = request.POST.get('totalRecords')         # # numeric value of number of rows of a table
     print(f"row: {row}")
     print(f"rowPerPage: {rowPerPage}")
 
     try:
-        query = checkQuery(query, row, rowPerPage)
+        query, isSelect = checkQuery(query, row, rowPerPage)
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
@@ -133,7 +145,18 @@ def updateData(request):
     try:
         cursor = connections[databaseType].cursor()
         recordsFiltered = cursor.execute(query)
-        result = cursor.fetchall()
+
+        for i in range(resultIndex):
+            cursor.nextset()
+
+        if isSelect:
+            result = cursor.fetchall()
+        else:
+            for i in range(row//rowPerPage):
+                cursor.fetchmany(size=rowPerPage)
+
+            result = cursor.fetchmany(size=rowPerPage)
+
         data = []
         for row in result:
             data.append({"\'" + attribute[i] + "\'": str(row[i]) for i in range(len(attribute))})
@@ -204,9 +227,17 @@ def ajax(request):
             return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
         endTime = time.time()
         totalExecutionTime += endTime - startTime
-
         executionTime.append(str(round(endTime - startTime, 2)) + ' s')
-        influencedRow = cursor.rowcount
+
+        influencedRow = []
+        cursorDescription = []
+
+        influencedRow.append(cursor.rowcount)
+        cursorDescription.append(cursor.description)
+        while cursor.nextset():
+            influencedRow.append(cursor.rowcount)
+            cursorDescription.append(cursor.description)
+
         totalRecords.append(influencedRow)
         executedTimeStamp.append(datetime.now().strftime("%m/%d/%Y %H:%M:%S"))
 
@@ -228,16 +259,19 @@ def ajax(request):
             displayedQuery.append(colorQuery)
 
             # DML (INSERT, UPDATE) will use "affected", DQL (SELECT) will use "retrieved"
-            if influencedRow == 0 or influencedRow == -1:
-                influencedRowResult.append(None)
-            elif influencedRow == 1:
-                temp = f"{influencedRow} row "
-                temp += "retrieved" if cursor.description else "affected"
-                influencedRowResult.append(temp)
-            else:
-                temp = f"{influencedRow} rows "
-                temp += "retrieved" if cursor.description else "affected"
-                influencedRowResult.append(temp)
+            tempRowResult = []
+            for i in range(len(influencedRow)):
+                if influencedRow[i] == 0 or influencedRow[i] == -1:
+                    tempRowResult.append(None)
+                elif influencedRow[i] == -1:
+                    temp = f"{influencedRow[i]} row "
+                    temp += "retrieved" if cursorDescription[i] else "affected"
+                    tempRowResult.append(temp)
+                else:
+                    temp = f"{influencedRow[i]} rows "
+                    temp += "retrieved" if cursorDescription[i] else "affected"
+                    tempRowResult.append(temp)
+            influencedRowResult.append(tempRowResult)
         except Exception as e:
             responseStatus = 1
             traceback.print_exc()
@@ -257,10 +291,13 @@ def ajax(request):
             traceback.print_exc()
             return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
         try:
-            if cursor.description:
-                resultAttribute.append([attribute[0] for attribute in cursor.description])
-            else:
-                resultAttribute.append(None)
+            tempResultAttribute = []
+            for description in cursorDescription:
+                if description:
+                    tempResultAttribute.append([attribute[0] for attribute in description])
+                else:
+                    tempResultAttribute.append(None)
+            resultAttribute.append(tempResultAttribute)
         except Exception as e:
             responseStatus = 1
             traceback.print_exc()
