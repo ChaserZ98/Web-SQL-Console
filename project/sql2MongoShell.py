@@ -5,6 +5,8 @@ SCALAR_FUNCTIONS = ['sqrt']
 
 BOOLEAN_OPERATORS = ['and', 'not', 'or']
 COMPARISON_OPERATORS = ['eq', 'gt', 'gte', 'lt', 'lte', 'ne']
+NULL_OPERATORS = ['exists', 'missing']  # exists → is not null, missing → is null
+STRING_OPERATOR = ['like', 'not_like']
 
 # select field type
 LITERAL = 'LITERAL'
@@ -80,6 +82,7 @@ def getSelectFieldTypesDic(fields):
     }
 
 
+# select
 def parseOneSelectField(field, selectFieldTypesDict, group, project):
     # literal
     literal = field['value'].get('literal') if type(field['value']) is dict else None
@@ -174,6 +177,7 @@ def parseSelectFields(fields, group, project):
     #     containWildCard = True
 
 
+# select distinct
 def parseOneSelectDistinctField(field, selectFieldTypesDict, group, project):
     # literal
     literal = field['value'].get('literal') if type(field['value']) is dict else None
@@ -286,22 +290,61 @@ def parseSelectDistinctFields(fields, group, project):
     #     containWildCard = True
 
 
-# todo
+# where
 def recursiveParseWhere(fields):
-    if type(fields) is dict:
-        for k, v in fields.items():
-            print(k, v)
-    elif type(fields) is list:
-        print(fields)
+    print(f'fields: {fields}')
+    if type(fields) is not dict:
+        return fields
+    operator = None
+    booleanOperator = False
+    comparisonOperator = False
+    nullOperator = False
+
+    for bo in BOOLEAN_OPERATORS:
+        if bo in fields:
+            booleanOperator = True
+            operator = bo
+            break
+    if not operator:
+        for co in COMPARISON_OPERATORS:
+            if co in fields:
+                comparisonOperator = True
+                operator = co
+                break
+    if not operator:
+        for no in NULL_OPERATORS:
+            if no in fields:
+                nullOperator = True
+                operator = no
+                break
+    print(f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}')
+    expression = {}
+    if operator == 'not':
+        expression[f'${operator}'] = [recursiveParseWhere(fields[operator])]
+    elif operator == 'missing':
+        expression['$eq'] = [f'${recursiveParseWhere(fields[operator])}', None]
+    elif operator == 'exists':
+        expression['$ne'] = [f'${recursiveParseWhere(fields[operator])}', None]
+    else:
+        firstElement = recursiveParseWhere(fields[operator][0])
+        secondElement = recursiveParseWhere(fields[operator][1])
+        if type(firstElement) is dict:
+            expression[f'${operator}'] = [firstElement, secondElement]
+        else:
+            expression[f'${operator}'] = [f'${firstElement}', secondElement]
+    return expression
+    # if comparisonOperator:
+    #     recursiveParseWhere(fields[comparisonOperator][0])
+    #     recursiveParseWhere(fields[comparisonOperator][1])
+    # elif booleanOperator:
+    #     recursiveParseWhere(fields[booleanOperator][0])
+    #     recursiveParseWhere(fields[booleanOperator][1])
 
 
 # todo
 def parseWhereFields(fields, match):
-    print(fields)
-    print(fields['and'][0])
-    # for k, v in fields.items():
-    #     print(k, v)
-    # match = fields
+    match['$expr'] = recursiveParseWhere(fields)
+    print(match)
 
 
 def parseOrderByFields(fields, sort):
@@ -325,9 +368,25 @@ def parseOrderByFields(fields, sort):
             sort[column] = 1
 
 
-# todo
-def parseGroupByFields(groupbyFields, group):
-    print(groupbyFields)
+def parseOneGroupByField(field, group):
+    column = field.get('value')
+    if '_id' in group:
+        if group['_id']:
+            group['_id'][column] = f'${column}'
+        else:
+            group['_id'] = {column: f'${column}'}
+    else:
+        group['_id'] = {column: f'${column}'}
+
+
+def parseGroupByFields(fields, group):
+    print(fields)
+    # multiple fields
+    if type(fields) is list:
+        for field in fields:
+            parseOneGroupByField(field, group)
+    else:
+        parseOneGroupByField(fields, group)
 
 
 # todo
@@ -388,8 +447,6 @@ def convertSelect(tokens):
         pipeline.append({'$sort': sort})
     if offsetField:
         pipeline.append({'$skip': offsetField})
-        if limitField:
-            limitField += offsetField
     if limitField:
         pipeline.append({"$limit": limitField})
 
@@ -410,7 +467,8 @@ def sql2MongoShell(tokens):
 
 
 if __name__ == '__main__':
-    sql = "select distinct sqrt(department_id), 'a', aisle_id from instacart_fact_table order by department_id desc, aisle_id"
+    sql = "select add_to_cart_order from instacart_fact_table where add_to_cart_order < 20 and add_to_cart_order > 2"
+    # sql = "Select price as price from instacart_fact_table limit 1 offset 2;"
     tokens = parse(sql)
     # tokens = parse("use adni")
     # print(list(tokens.keys())[0])
