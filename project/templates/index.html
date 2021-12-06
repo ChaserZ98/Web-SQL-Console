@@ -68,20 +68,18 @@
                             document.getElementById('execution-time').innerText = totalExecutionTime;
                             currentDatabaseName.innerText = currentDatabase;
 
-
-
                             for(let i in tableQuery){
-
-                                console.log(influencedRowResult[i])
                                 let p = document.createElement('p');
                                 p.id = 'result' + i;
+                                let statusText = ""
                                 p.innerHTML =  "<span style='color: green'>" + currentDatabaseName.innerText + " ></span></br>" +
                                     displayedQuery[i] + "</br>" +
                                     "[" + executedTimeStamp[i] + "] " +
-                                    (influencedRowResult[i] ? influencedRowResult[i] : "completed") +
+                                    (influencedRowResult[i][influencedRowResult[i].length - 1] ? influencedRowResult[i][influencedRowResult[i].length - 1] : "completed") +
                                     " in " + executionTime[i];
                                 resultTableDiv.appendChild(p);
 
+                                let resultLength = resultAttribute[i].length
                                 for(let j in resultAttribute[i]){
                                     if(resultAttribute[i][j]){
                                         let table = document.createElement('table');
@@ -89,7 +87,8 @@
                                         table.className = "cell-border compact display dataTable hover";
                                         table.width = '100%';
                                         let caption = document.createElement('caption');
-                                        caption.innerText = tableQuery[i].toString();
+                                        // caption.innerText = tableQuery[i].toString();
+                                        caption.innerText = resultLength > 1 ? "Result Table " + i + "-" + j : "Result Table " + i;
                                         table.appendChild(caption);
                                         let thead = document.createElement('thead');
                                         let tr = document.createElement('tr');
