@@ -140,9 +140,14 @@ def updateData(request):
 
         if databaseType == 'mongodb':
             db = mongoClient[currentDatabase]
-            mongoQuery = sql2MongoShell(query)
-            mongoCursor = eval(mongoQuery)
-            mongoListCursor = list(mongoCursor)
+            if query.lower() == 'show dbs':
+                mongoListCursor = []
+                for name in mongoClient.list_database_names():
+                    mongoListCursor.append({'database': name})
+            else:
+                mongoQuery = sql2MongoShell(query)
+                mongoCursor = eval(mongoQuery)
+                mongoListCursor = list(mongoCursor)
         else:
             cursor = connections[databaseType].cursor()
             recordsFiltered = cursor.execute(query)
@@ -237,6 +242,7 @@ def ajax(request):
         startTime = time.time()
         try:
             if databaseType == 'mongodb':
+                print(sql)
                 if sql.lower() == 'show dbs':
                     # print(mongoClient.list_database_names(), type(mongoClient.list_database_names()))
                     influencedRow.append(len(mongoClient.list_database_names()))
@@ -322,6 +328,7 @@ def ajax(request):
         try:
             if databaseType == 'mysql':
                 queryResult.append(cursor.fetchmany(size=100))
+                print(queryResult)
             elif databaseType == 'redshift':
                 # no result will be fetched if the last query is DML (INSERT, UPDATE)
                 if cursor.description:
@@ -330,18 +337,21 @@ def ajax(request):
                 else:
                     queryResult.append(())
             elif databaseType == 'mongodb':
-                tempResult = []
-                for row in mongoListCursor[:100]:
-                    tempTuple = []
-                    for k, v in row.items():
-                        if k == '_id':
-                            tempTuple.append(str(v))
-                        else:
-                            tempTuple.append(v)
-                    tempTuple = tuple(tempTuple)
-                    tempResult.append(tempTuple)
-                    # tempResult.append(tuple(row.values()))
-                queryResult.append(tuple(tempResult))
+                if mongoListCursor:
+                    tempResult = []
+                    for row in mongoListCursor[:100]:
+                        tempTuple = []
+                        for k, v in row.items():
+                            if k == '_id':
+                                tempTuple.append(str(v))
+                            else:
+                                tempTuple.append(v)
+                        tempTuple = tuple(tempTuple)
+                        tempResult.append(tempTuple)
+                        # tempResult.append(tuple(row.values()))
+                    queryResult.append(tuple(tempResult))
+                else:
+                    queryResult.append(tuple())
         except Exception as e:
             responseStatus = 1
             traceback.print_exc()
@@ -380,6 +390,8 @@ def ajax(request):
         elif databaseType == 'redshift':
             cursor.execute('select current_database()')
             currentDatabase = cursor.fetchone()[0]
+        elif databaseType == 'mongodb':
+            currentDatabase = db.name
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
