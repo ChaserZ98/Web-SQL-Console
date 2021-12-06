@@ -255,7 +255,7 @@ def ajax(request):
                     cursorDescription.append(None)
                 else:
                     mongoQuery = sql2MongoShell(sql)
-                    # print(mongoQuery)
+                    print(mongoQuery)
                     mongoCursor = eval(mongoQuery)
                     mongoListCursor = list(mongoCursor)
                     influencedRow.append(len(mongoListCursor))
