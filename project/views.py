@@ -53,17 +53,15 @@ def connectToDB(request):
         elif databaseType == 'mongodb':
             result = db.name
             # pipeline = [
-            #     {'$group': {'_id': None,
-            #                 'sum(product_id)': {'$sum': '$product_id'},
-            #                 'avg(product_id)': {'$avg': '$product_id'}}},
-            #     {'$project': {'b': '$sum(product_id)',
-            #                   '_id': 0,
-            #                   'c': '$avg(product_id)'}},
-            #     {'$limit': 10}
+            #     {'$match': {'$and': [{'product_name': {'$regex': '.*Cookie.*'}}, {'product_id': {'$gte': 100}}]}}, {'$group': {'product_id': {'$first': '$product_id'}, 'product_name': {'$first': '$product_name'}, '_id': {'department_id': '$department_id'}}}, {'$project': {'product_id': '$product_id', '_id': 0, 'department_id': '$_id.department_id', 'product_name': '$product_name'}}
             # ]
-            # temp = eval(f"db.instacart_fact_table.aggregate({pipeline}, allowDiskUse=True)")
-            # for doc in temp:
-            #     print(doc)
+            # # temp = eval(f"db.instacart_fact_table.aggregate({pipeline}, allowDiskUse=True)")
+            # temp = mongoClient.list_database_names()
+            # print(pipeline)
+            # # print(list(temp)[0:5])
+            # print()
+            # for row in temp:
+            #     print(row)
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()

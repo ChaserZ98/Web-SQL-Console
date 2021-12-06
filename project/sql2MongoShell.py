@@ -6,7 +6,7 @@ SCALAR_FUNCTIONS = ['sqrt']
 BOOLEAN_OPERATORS = ['and', 'not', 'or']
 COMPARISON_OPERATORS = ['eq', 'gt', 'gte', 'lt', 'lte', 'ne']
 NULL_OPERATORS = ['exists', 'missing']  # exists → is not null, missing → is null
-STRING_OPERATOR = ['like', 'not_like']
+STRING_OPERATORS = ['like', 'not_like']
 
 # select field type
 LITERAL = 'LITERAL'
@@ -83,7 +83,7 @@ def getSelectFieldTypesDic(fields):
 
 
 # select
-def parseOneSelectField(field, selectFieldTypesDict, group, project):
+def parseOneSelectField(field, selectFieldTypesDict, groupbyColumns, group, project):
     # literal
     literal = field['value'].get('literal') if type(field['value']) is dict else None
 
@@ -145,9 +145,12 @@ def parseOneSelectField(field, selectFieldTypesDict, group, project):
         column = field['value'][scalarFunc]
         alias = field['name'] if field.get('name') else f"{scalarFunc}({column})"
         projectExpression = {f'${scalarFunc}': f'${column}'}
-        if selectFieldTypesDict['containAggregateFunc']:
-            group[f"{scalarFunc}({column})"] = {'$first': projectExpression}
-            project[alias] = f'${scalarFunc}({column})'
+        if selectFieldTypesDict['containAggregateFunc'] or groupbyColumns:
+            if alias not in groupbyColumns:
+                group[f"{scalarFunc}({column})"] = {'$first': projectExpression}
+                project[alias] = f'${scalarFunc}({column})'
+            else:
+                project[alias] = f'$_id.{scalarFunc}({column})'
         else:
             project[alias] = projectExpression
         project['_id'] = 0
@@ -155,30 +158,35 @@ def parseOneSelectField(field, selectFieldTypesDict, group, project):
     else:
         column = field['value']
         alias = field['name'] if field.get('name') else column
-        if selectFieldTypesDict['containAggregateFunc']:
-            group[column] = {'$first': f'${column}'}
-        project[alias] = f"${column}"
+        if selectFieldTypesDict['containAggregateFunc'] or groupbyColumns:
+            if alias not in groupbyColumns:
+                group[column] = {'$first': f'${column}'}
+                project[alias] = f"${column}"
+            else:
+                project[alias] = f"$_id.{column}"
+        else:
+            project[alias] = f"${column}"
         project['_id'] = 0
 
 
-def parseSelectFields(fields, group, project):
+def parseSelectFields(fields, groupbyColumns, group, project):
     # print(fields)
     selectFieldTypesDict = getSelectFieldTypesDic(fields)
 
     # multiple field (assume no wildcard)
     if type(fields) is list:
         for field in fields:
-            fieldType = parseOneSelectField(field, selectFieldTypesDict, group, project)
+            parseOneSelectField(field, selectFieldTypesDict, groupbyColumns, group, project)
     # single field (assume no wildcard)
     elif type(fields) is dict:
-        fieldType = parseOneSelectField(fields, selectFieldTypesDict, group, project)
+        parseOneSelectField(fields, selectFieldTypesDict, groupbyColumns, group, project)
     # wildcard *
     # else:
     #     containWildCard = True
 
 
 # select distinct
-def parseOneSelectDistinctField(field, selectFieldTypesDict, group, project):
+def parseOneSelectDistinctField(field, selectFieldTypesDict, groupbyColumns, group, project):
     # literal
     literal = field['value'].get('literal') if type(field['value']) is dict else None
 
@@ -274,17 +282,17 @@ def parseOneSelectDistinctField(field, selectFieldTypesDict, group, project):
         project['_id'] = 0
 
 
-def parseSelectDistinctFields(fields, group, project):
+def parseSelectDistinctFields(fields, groupbyColumns, group, project):
     # print(fields)
     selectFieldTypesDict = getSelectFieldTypesDic(fields)
 
     # multiple field (assume no wildcard)
     if type(fields) is list:
         for field in fields:
-            parseOneSelectDistinctField(field, selectFieldTypesDict, group, project)
+            parseOneSelectDistinctField(field, selectFieldTypesDict, groupbyColumns, group, project)
     # single field (assume no wildcard)
     elif type(fields) is dict:
-        parseOneSelectDistinctField(fields, selectFieldTypesDict, group, project)
+        parseOneSelectDistinctField(fields, selectFieldTypesDict, groupbyColumns, group, project)
     # wildcard *
     # else:
     #     containWildCard = True
@@ -292,13 +300,14 @@ def parseSelectDistinctFields(fields, group, project):
 
 # where
 def recursiveParseWhere(fields):
-    print(f'fields: {fields}')
+    # print(f'fields: {fields}')
     if type(fields) is not dict:
         return fields
     operator = None
     booleanOperator = False
     comparisonOperator = False
     nullOperator = False
+    stringOperator = False
 
     for bo in BOOLEAN_OPERATORS:
         if bo in fields:
@@ -317,21 +326,40 @@ def recursiveParseWhere(fields):
                 nullOperator = True
                 operator = no
                 break
-    print(f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}')
+    if not operator:
+        for so in STRING_OPERATORS:
+            if so in fields:
+                stringOperator = True
+                operator = so
+                break
+    print(f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}, nullOperator: {nullOperator}, stringOperator: {stringOperator}')
     expression = {}
     if operator == 'not':
         expression[f'${operator}'] = [recursiveParseWhere(fields[operator])]
     elif operator == 'missing':
-        expression['$eq'] = [f'${recursiveParseWhere(fields[operator])}', None]
+        expression[fields[operator]] = {'$eq': None}
+        # expression['$eq'] = [f'${recursiveParseWhere(fields[operator])}', None]
     elif operator == 'exists':
-        expression['$ne'] = [f'${recursiveParseWhere(fields[operator])}', None]
+        expression[fields[operator]] = {'$ne': None}
+        # expression['$ne'] = [f'${recursiveParseWhere(fields[operator])}', None]
+    elif operator == 'like':
+        column = fields[operator][0]
+        regex = fields[operator][1]['literal']
+        regex = regex.replace('%', '.*')
+        expression[column] = {'$regex': regex}
+    elif operator == 'not_like':
+        column = fields[operator][0]
+        regex = fields[operator][1]['literal']
+        regex = regex.replace('%', '.*')
+        expression[column] = {'$not': {'$regex': regex}}
     else:
         firstElement = recursiveParseWhere(fields[operator][0])
         secondElement = recursiveParseWhere(fields[operator][1])
-        if type(firstElement) is dict:
+        if booleanOperator:
             expression[f'${operator}'] = [firstElement, secondElement]
         else:
-            expression[f'${operator}'] = [f'${firstElement}', secondElement]
+            expression[firstElement] = {f'${operator}': secondElement}
+            # expression[f'${operator}'] = [f'${firstElement}', secondElement]
     return expression
     # if comparisonOperator:
     #     recursiveParseWhere(fields[comparisonOperator][0])
@@ -339,12 +367,6 @@ def recursiveParseWhere(fields):
     # elif booleanOperator:
     #     recursiveParseWhere(fields[booleanOperator][0])
     #     recursiveParseWhere(fields[booleanOperator][1])
-
-
-# todo
-def parseWhereFields(fields, match):
-    match['$expr'] = recursiveParseWhere(fields)
-    print(match)
 
 
 def parseOrderByFields(fields, sort):
@@ -390,8 +412,69 @@ def parseGroupByFields(fields, group):
 
 
 # todo
-def parseHavingFields(havingFields, match):
-    print(havingFields)
+def recursiveParseHaving(fields):
+    # print(f'fields: {fields}')
+    if type(fields) is not dict:
+        return fields
+    operator = None
+    booleanOperator = False
+    comparisonOperator = False
+    nullOperator = False
+    stringOperator = False
+
+    for bo in BOOLEAN_OPERATORS:
+        if bo in fields:
+            booleanOperator = True
+            operator = bo
+            break
+    if not operator:
+        for co in COMPARISON_OPERATORS:
+            if co in fields:
+                comparisonOperator = True
+                operator = co
+                break
+    if not operator:
+        for no in NULL_OPERATORS:
+            if no in fields:
+                nullOperator = True
+                operator = no
+                break
+    if not operator:
+        for so in STRING_OPERATORS:
+            if so in fields:
+                stringOperator = True
+                operator = so
+                break
+    print(
+        f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}, nullOperator: {nullOperator}, stringOperator: {stringOperator}')
+    expression = {}
+    if operator == 'not':
+        expression[f'${operator}'] = [recursiveParseWhere(fields[operator])]
+    elif operator == 'missing':
+        expression[fields[operator]] = {'$eq': None}
+        # expression['$eq'] = [f'${recursiveParseWhere(fields[operator])}', None]
+    elif operator == 'exists':
+        expression[fields[operator]] = {'$ne': None}
+        # expression['$ne'] = [f'${recursiveParseWhere(fields[operator])}', None]
+    elif operator == 'like':
+        column = fields[operator][0]
+        regex = fields[operator][1]['literal']
+        regex = regex.replace('%', '.*')
+        expression[column] = {'$regex': regex}
+    elif operator == 'not_like':
+        column = fields[operator][0]
+        regex = fields[operator][1]['literal']
+        regex = regex.replace('%', '.*')
+        expression[column] = {'$not': {'$regex': regex}}
+    else:
+        firstElement = recursiveParseWhere(fields[operator][0])
+        secondElement = recursiveParseWhere(fields[operator][1])
+        if booleanOperator:
+            expression[f'${operator}'] = [firstElement, secondElement]
+        else:
+            expression[firstElement] = {f'${operator}': secondElement}
+            # expression[f'${operator}'] = [f'${firstElement}', secondElement]
+    return expression
 
 
 def convertSelect(tokens):
@@ -419,28 +502,41 @@ def convertSelect(tokens):
     pipeline = []
     group = {}
     project = {}
-    match = {}
+    match_where = {}
     sort = {}
+    match_having = {}
+
+    groupbyColumns = []
+    if groupbyFields:
+        if type(groupbyFields) is list:
+            for field in groupbyFields:
+                groupbyColumns.append(field['value'])
+        else:
+            groupbyColumns.append(groupbyFields['value'])
+    print(f'groupbyColumns: {groupbyColumns}')
 
     # select fields
     if selectFields:
-        parseSelectFields(selectFields, group, project)
+        parseSelectFields(selectFields, groupbyColumns, group, project)
     # select distinct
     elif selectDistinctFields:
-        parseSelectDistinctFields(selectDistinctFields, group, project)
+        parseSelectDistinctFields(selectDistinctFields, groupbyColumns, group, project)
     if groupbyFields:
         parseGroupByFields(groupbyFields, group)
-    if havingFields:
-        parseHavingFields(havingFields, match)
     if whereFields:
-        parseWhereFields(whereFields, match)
+        match_where = recursiveParseWhere(whereFields)
+        # match = parseWhereFields(whereFields, match)
+    if havingFields:
+        match_having = recursiveParseHaving(havingFields)
     if orderbyFields:
         parseOrderByFields(orderbyFields, sort)
 
-    if match:
-        pipeline.append({'$match': match})
+    if match_where:
+        pipeline.append({'$match': match_where})
     if group:
         pipeline.append({'$group': group})
+    if match_having:
+        pipeline.append({'$match': match_having})
     if project:
         pipeline.append({'$project': project})
     if sort:
@@ -467,7 +563,7 @@ def sql2MongoShell(tokens):
 
 
 if __name__ == '__main__':
-    sql = "select add_to_cart_order from instacart_fact_table where add_to_cart_order < 20 and add_to_cart_order > 2"
+    sql = "select add_to_cart_order from instacart_fact_table where add_to_cart_order > 10 group by add_to_cart_order"
     # sql = "Select price as price from instacart_fact_table limit 1 offset 2;"
     tokens = parse(sql)
     # tokens = parse("use adni")
