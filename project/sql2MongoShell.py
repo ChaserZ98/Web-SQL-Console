@@ -116,26 +116,14 @@ def parseOneSelectField(field, selectFieldTypesDict, groupbyColumns, group, proj
 
         if '_id' not in group:
             group['_id'] = None
-        if aggregateFunc == 'sum':
-            mongoAccumulator = "$sum"
-            mongoExpression = f"${column}"
-            # group[f"{aggregateFunc}({column})"] = {"$sum": f"${column}"}
-        elif aggregateFunc == 'count':
+
+        if aggregateFunc == 'count':
             mongoAccumulator = "$sum"
             mongoExpression = 1
             # group[f"{aggregateFunc}({column})"] = {"$sum": 1}
-        elif aggregateFunc == 'avg':
-            mongoAccumulator = "$avg"
-            mongoExpression = f"${column}"
-            # group[f"{aggregateFunc}({column})"] = {"$avg": f"${column}"}
-        elif aggregateFunc == 'max':
-            mongoAccumulator = "$max"
-            mongoExpression = f"${column}"
-            # group[f"{aggregateFunc}({column})"] = {"$max": f"${column}"}
-        elif aggregateFunc == 'min':
-            mongoAccumulator = "$min"
-            mongoExpression = f"${column}"
-            # group[f"{aggregateFunc}({column})"] = {"$min": f"${column}"}
+        else:
+            mongoAccumulator = f'${aggregateFunc}'
+            mongoExpression = f'${column}'
         group[f"{aggregateFunc}({column})"] = {mongoAccumulator: mongoExpression}
 
         project[alias] = f"${aggregateFunc}({column})"
@@ -229,20 +217,12 @@ def parseOneSelectDistinctField(field, selectFieldTypesDict, groupbyColumns, gro
 
         if '_id' not in group:
             group['_id'] = None
-        if aggregateFunc == 'sum':
-            mongoAccumulator = "$sum"
-            mongoExpression = f"${column}"
-        elif aggregateFunc == 'count':
+
+        if aggregateFunc == 'count':
             mongoAccumulator = "$sum"
             mongoExpression = 1
-        elif aggregateFunc == 'avg':
-            mongoAccumulator = "$avg"
-            mongoExpression = f"${column}"
-        elif aggregateFunc == 'max':
-            mongoAccumulator = "$max"
-            mongoExpression = f"${column}"
-        elif aggregateFunc == 'min':
-            mongoAccumulator = "$min"
+        else:
+            mongoAccumulator = f'${aggregateFunc}'
             mongoExpression = f"${column}"
         group[f"{aggregateFunc}({column})"] = {mongoAccumulator: mongoExpression}
 
@@ -332,7 +312,7 @@ def recursiveParseWhere(fields):
                 stringOperator = True
                 operator = so
                 break
-    print(f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}, nullOperator: {nullOperator}, stringOperator: {stringOperator}')
+    # print(f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}, nullOperator: {nullOperator}, stringOperator: {stringOperator}')
     expression = {}
     if operator == 'not':
         expression[f'${operator}'] = [recursiveParseWhere(fields[operator])]
@@ -353,12 +333,10 @@ def recursiveParseWhere(fields):
         regex = regex.replace('%', '.*')
         expression[column] = {'$not': {'$regex': regex}}
     else:
-        firstElement = recursiveParseWhere(fields[operator][0])
-        secondElement = recursiveParseWhere(fields[operator][1])
         if booleanOperator:
-            expression[f'${operator}'] = [firstElement, secondElement]
+            expression[f'${operator}'] = [recursiveParseWhere(field) for field in fields[operator]]
         else:
-            expression[firstElement] = {f'${operator}': secondElement}
+            expression[recursiveParseWhere(fields[operator][0])] = {f'${operator}': recursiveParseWhere(fields[operator][1])}
             # expression[f'${operator}'] = [f'${firstElement}', secondElement]
     return expression
     # if comparisonOperator:
@@ -369,13 +347,14 @@ def recursiveParseWhere(fields):
     #     recursiveParseWhere(fields[booleanOperator][1])
 
 
+# order by
 def parseOrderByFields(fields, sort):
     # multiple fields
     if type(fields) is list:
         for field in fields:
             column = field.get('value')
             desc = field.get('sort')
-            print(column)
+            # print(column)
             if desc:
                 sort[column] = -1
             else:
@@ -390,6 +369,7 @@ def parseOrderByFields(fields, sort):
             sort[column] = 1
 
 
+# group by
 def parseOneGroupByField(field, group):
     column = field.get('value')
     if '_id' in group:
@@ -402,7 +382,7 @@ def parseOneGroupByField(field, group):
 
 
 def parseGroupByFields(fields, group):
-    print(fields)
+    # print(fields)
     # multiple fields
     if type(fields) is list:
         for field in fields:
@@ -411,16 +391,23 @@ def parseGroupByFields(fields, group):
         parseOneGroupByField(fields, group)
 
 
-# todo
-def recursiveParseHaving(fields):
+# having
+def recursiveParseHaving(fields, group):
     # print(f'fields: {fields}')
     if type(fields) is not dict:
         return fields
+    if list(fields.keys())[0] in AGGREGATE_FUNCTIONS:
+        agg = list(fields.keys())[0]
+        column = fields[agg]
+        if f'{agg}({column})' not in group:
+            if agg == 'count':
+                group[f'{agg}({column})'] = {'$sum': 1}
+            else:
+                group[f'{agg}({column})'] = {f'${agg}': f'${column}'}
+        return f'${agg}({column})'
     operator = None
     booleanOperator = False
     comparisonOperator = False
-    nullOperator = False
-    stringOperator = False
 
     for bo in BOOLEAN_OPERATORS:
         if bo in fields:
@@ -433,46 +420,19 @@ def recursiveParseHaving(fields):
                 comparisonOperator = True
                 operator = co
                 break
-    if not operator:
-        for no in NULL_OPERATORS:
-            if no in fields:
-                nullOperator = True
-                operator = no
-                break
-    if not operator:
-        for so in STRING_OPERATORS:
-            if so in fields:
-                stringOperator = True
-                operator = so
-                break
-    print(
-        f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}, nullOperator: {nullOperator}, stringOperator: {stringOperator}')
+
+    # print(f'operator: {operator}, booleanOperator: {booleanOperator}, comparisonOperator: {comparisonOperator}')
+    # print(fields['and'])
     expression = {}
     if operator == 'not':
-        expression[f'${operator}'] = [recursiveParseWhere(fields[operator])]
-    elif operator == 'missing':
-        expression[fields[operator]] = {'$eq': None}
-        # expression['$eq'] = [f'${recursiveParseWhere(fields[operator])}', None]
-    elif operator == 'exists':
-        expression[fields[operator]] = {'$ne': None}
-        # expression['$ne'] = [f'${recursiveParseWhere(fields[operator])}', None]
-    elif operator == 'like':
-        column = fields[operator][0]
-        regex = fields[operator][1]['literal']
-        regex = regex.replace('%', '.*')
-        expression[column] = {'$regex': regex}
-    elif operator == 'not_like':
-        column = fields[operator][0]
-        regex = fields[operator][1]['literal']
-        regex = regex.replace('%', '.*')
-        expression[column] = {'$not': {'$regex': regex}}
+        expression[f'${operator}'] = [recursiveParseHaving(fields[operator], group)]
     else:
-        firstElement = recursiveParseWhere(fields[operator][0])
-        secondElement = recursiveParseWhere(fields[operator][1])
         if booleanOperator:
-            expression[f'${operator}'] = [firstElement, secondElement]
+            expression[f'${operator}'] = [recursiveParseHaving(field, group) for field in fields[operator]]
+        elif comparisonOperator:
+            expression[f'${operator}'] = [recursiveParseHaving(fields[operator][0], group), recursiveParseHaving(fields[operator][1], group)]
         else:
-            expression[firstElement] = {f'${operator}': secondElement}
+            expression[recursiveParseHaving(fields[operator][0], group)] = {f'${operator}': recursiveParseHaving(fields[operator][1], group)}
             # expression[f'${operator}'] = [f'${firstElement}', secondElement]
     return expression
 
@@ -489,15 +449,15 @@ def convertSelect(tokens):
     limitField = tokens['limit'] if 'limit' in tokens else None
     offsetField = tokens['offset'] if 'offset' in tokens else None
 
-    print(f"select: {selectFields}")
-    print(f"select_distinct: {selectDistinctFields}")
-    print(f"from: {fromField}")
-    print(f"where: {whereFields}")
-    print(f"groupby: {groupbyFields}")
-    print(f"having: {havingFields}")
-    print(f"orderby: {orderbyFields}")
-    print(f"limit: {limitField}")
-    print(f"offset: {offsetField}")
+    # print(f"select: {selectFields}")
+    # print(f"select_distinct: {selectDistinctFields}")
+    # print(f"from: {fromField}")
+    # print(f"where: {whereFields}")
+    # print(f"groupby: {groupbyFields}")
+    # print(f"having: {havingFields}")
+    # print(f"orderby: {orderbyFields}")
+    # print(f"limit: {limitField}")
+    # print(f"offset: {offsetField}")
 
     pipeline = []
     group = {}
@@ -513,7 +473,7 @@ def convertSelect(tokens):
                 groupbyColumns.append(field['value'])
         else:
             groupbyColumns.append(groupbyFields['value'])
-    print(f'groupbyColumns: {groupbyColumns}')
+    # print(f'groupbyColumns: {groupbyColumns}')
 
     # select fields
     if selectFields:
@@ -527,7 +487,7 @@ def convertSelect(tokens):
         match_where = recursiveParseWhere(whereFields)
         # match = parseWhereFields(whereFields, match)
     if havingFields:
-        match_having = recursiveParseHaving(havingFields)
+        match_having['$expr'] = recursiveParseHaving(havingFields, group)
     if orderbyFields:
         parseOrderByFields(orderbyFields, sort)
 
@@ -546,25 +506,24 @@ def convertSelect(tokens):
     if limitField:
         pipeline.append({"$limit": limitField})
 
-    print()
-    print(f"pipeline: {pipeline}")
+    # print()
+    # print(f"pipeline: {pipeline}")
 
-    mongoQuery = f"db.{fromField}.aggregate({pipeline}, {{allowDiskUse: True}})"
-    print(f"MongoDB Query: {mongoQuery}")
+    # mongoQuery = f"db.{fromField}.aggregate({pipeline}, {{allowDiskUse: True}})"
+    # print(f"MongoDB Query: {mongoQuery}")
 
-    return mongoQuery
+    return f"db.{fromField}.aggregate({pipeline}, {{allowDiskUse: True}})"
 
 
 def sql2MongoShell(tokens):
     queryType = list(tokens.keys())[0]
     if queryType == 'select' or queryType == 'select_distinct':
-        convertSelect(tokens)
-    return
+        return convertSelect(tokens)
+    return None
 
-
+# test
 if __name__ == '__main__':
-    sql = "select add_to_cart_order from instacart_fact_table where add_to_cart_order > 10 group by add_to_cart_order"
-    # sql = "Select price as price from instacart_fact_table limit 1 offset 2;"
+    sql = "select product_id, aisle_id, department_id, order_id from instacart_fact_table where product_id = 1 and aisle_id = 61 and department_id = 19"
     tokens = parse(sql)
     # tokens = parse("use adni")
     # print(list(tokens.keys())[0])
@@ -573,5 +532,6 @@ if __name__ == '__main__':
     # print()
     print(tokens)
     print()
-    sql2MongoShell(tokens)
+    mongoQuery = sql2MongoShell(tokens)
     print(f"SQL: {sql}")
+    print(f"Mongo Query: {mongoQuery}")
