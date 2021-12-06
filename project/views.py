@@ -140,7 +140,7 @@ def updateData(request):
 
         if databaseType == 'mongodb':
             db = mongoClient[currentDatabase]
-            if query.lower() == 'show dbs':
+            if query.lower() == 'show dbs' or query.lower() == 'show dbs;':
                 mongoListCursor = []
                 for name in mongoClient.list_database_names():
                     mongoListCursor.append({'database': name})
@@ -243,7 +243,7 @@ def ajax(request):
         try:
             if databaseType == 'mongodb':
                 print(sql)
-                if sql.lower() == 'show dbs':
+                if sql.lower() == 'show dbs' or sql.lower() == 'show dbs;':
                     # print(mongoClient.list_database_names(), type(mongoClient.list_database_names()))
                     influencedRow.append(len(mongoClient.list_database_names()))
                     cursorDescription.append((('database',),))
