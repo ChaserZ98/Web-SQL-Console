@@ -512,10 +512,11 @@ def convertSelect(tokens):
     # mongoQuery = f"db.{fromField}.aggregate({pipeline}, {{allowDiskUse: True}})"
     # print(f"MongoDB Query: {mongoQuery}")
 
-    return f"db.{fromField}.aggregate({pipeline}, {{allowDiskUse: True}})"
+    return f"db.{fromField}.aggregate({pipeline}, allowDiskUse=True)"
 
 
-def sql2MongoShell(tokens):
+def sql2MongoShell(sql):
+    tokens = parse(sql)
     queryType = list(tokens.keys())[0]
     if queryType == 'select' or queryType == 'select_distinct':
         return convertSelect(tokens)
@@ -532,6 +533,6 @@ if __name__ == '__main__':
     # print()
     print(tokens)
     print()
-    mongoQuery = sql2MongoShell(tokens)
+    mongoQuery = sql2MongoShell(sql)
     print(f"SQL: {sql}")
     print(f"Mongo Query: {mongoQuery}")

@@ -10,6 +10,7 @@ import re
 from project import mongoClient
 from datetime import datetime
 import sqlparse
+from project.sql2MongoShell import sql2MongoShell
 
 # def index(request):
 #     return HttpResponse('project index page')
@@ -52,16 +53,7 @@ def connectToDB(request):
             result = cursor.fetchone()[0]
         elif databaseType == 'mongodb':
             result = db.name
-            # pipeline = [
-            #     {'$match': {'$and': [{'product_name': {'$regex': '.*Cookie.*'}}, {'product_id': {'$gte': 100}}]}}, {'$group': {'product_id': {'$first': '$product_id'}, 'product_name': {'$first': '$product_name'}, '_id': {'department_id': '$department_id'}}}, {'$project': {'product_id': '$product_id', '_id': 0, 'department_id': '$_id.department_id', 'product_name': '$product_name'}}
-            # ]
-            # # temp = eval(f"db.instacart_fact_table.aggregate({pipeline}, allowDiskUse=True)")
-            # temp = mongoClient.list_database_names()
-            # print(pipeline)
-            # # print(list(temp)[0:5])
-            # print()
-            # for row in temp:
-            #     print(row)
+
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
@@ -121,13 +113,14 @@ def checkQuery(query, row, rowPerPage):
 
 def updateData(request):
     databaseType = request.POST.get('databaseType')         # mysql/redshift/mongoDB
+    currentDatabase = request.POST.get('currentDatabase')   # used database/schema
     draw = request.POST.get('draw')                         # number of call
     row = int(request.POST.get('start'))                    # number of records before this page
     rowPerPage = int(request.POST.get('length'))            # number of records displayed in a page
     attribute = request.POST.getlist('attribute[]')         # attribute list of a table
     resultIndex = int(request.POST.get('resultIndex'))      # index of the table in a query result
     query = request.POST.get('query')                       # executed query for the table
-    totalRecords = request.POST.get('totalRecords')         # # numeric value of number of rows of a table
+    totalRecords = request.POST.get('totalRecords')         # numeric value of number of rows of a table
     print(f"row: {row}")
     print(f"rowPerPage: {rowPerPage}")
 
@@ -140,37 +133,42 @@ def updateData(request):
 
     print(f"Executed Query: {query}")
 
+    cursor = None
+    mongoCursor = None
+    mongoListCursor = None
     try:
-        # if databaseType == 'mysql':
-        cursor = connections[databaseType].cursor()
-        recordsFiltered = cursor.execute(query)
+
+        if databaseType == 'mongodb':
+            db = mongoClient[currentDatabase]
+            mongoQuery = sql2MongoShell(query)
+            mongoCursor = eval(mongoQuery)
+            mongoListCursor = list(mongoCursor)
+        else:
+            cursor = connections[databaseType].cursor()
+            recordsFiltered = cursor.execute(query)
 
         if databaseType == 'mysql':
             for i in range(resultIndex):
                 cursor.nextset()
 
-        if isSelect:
-            result = cursor.fetchall()
-        else:
-            for i in range(row//rowPerPage):
-                cursor.fetchmany(size=rowPerPage)
-            result = cursor.fetchmany(size=rowPerPage)
-
         data = []
-        for row in result:
-            data.append({"\'" + attribute[i] + "\'": str(row[i]) for i in range(len(attribute))})
-        # elif databaseType == 'redshift':
-        #     cursor = connections[databaseType].cursor()
-        #     recordsFiltered = cursor.execute(query)
-        #     if isSelect:
-        #         result = cursor.fetchall()
-        #     else:
-        #         for i in range(row//rowPerPage):
-        #             cursor.fetchmany(size=rowPerPage)
-        #         result = cursor.fetchmany(size=rowPerPage)
-        #     data = []
-        #     for row in result:
-        #         data.append({"\'" + attribute[i] + "\'": str(row[i]) for i in range(len(attribute))})
+
+        if databaseType == 'mongodb':
+            for row in mongoListCursor:
+                newRow = {}
+                for k, v in row.items():
+                    newRow["\'" + k + "\'"] = str(v)
+                data.append(newRow)
+        else:
+            if isSelect:
+                result = cursor.fetchall()
+            else:
+                for i in range(row//rowPerPage):
+                    cursor.fetchmany(size=rowPerPage)
+                result = cursor.fetchmany(size=rowPerPage)
+
+            for row in result:
+                data.append({"\'" + attribute[i] + "\'": str(row[i]) for i in range(len(attribute))})
     except Exception as e:
         responseStatus = 1
         traceback.print_exc()
@@ -229,9 +227,41 @@ def ajax(request):
         return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
 
     for sql in query:
+
+        influencedRow = []
+        cursorDescription = []
+
+        mongoCursor = None
+        mongoListCursor = None
+
         startTime = time.time()
         try:
-            cursor.execute(sql)
+            if databaseType == 'mongodb':
+                if sql.lower() == 'show dbs':
+                    # print(mongoClient.list_database_names(), type(mongoClient.list_database_names()))
+                    influencedRow.append(len(mongoClient.list_database_names()))
+                    cursorDescription.append((('database',),))
+                    # print(cursorDescription)
+                elif sql.lower()[:3] == 'use':
+                    databaseName = "".join(letter if letter != ';' else '' for letter in sql[4:])
+                    db = mongoClient[databaseName]
+                    influencedRow.append(0)
+                    cursorDescription.append(None)
+                else:
+                    mongoQuery = sql2MongoShell(sql)
+                    # print(mongoQuery)
+                    mongoCursor = eval(mongoQuery)
+                    mongoListCursor = list(mongoCursor)
+                    influencedRow.append(len(mongoListCursor))
+
+                    tempDescription = []
+                    for attribute in list(mongoListCursor[0].keys()):
+                        tempDescription.append((attribute,))
+                    tempDescription = tuple(tempDescription)
+                    cursorDescription.append(tempDescription)
+                    # exit()
+            else:
+                cursor.execute(sql)
         except Exception as e:
             responseStatus = 1
             traceback.print_exc()
@@ -240,15 +270,16 @@ def ajax(request):
         totalExecutionTime += endTime - startTime
         executionTime.append(str(round(endTime - startTime, 2)) + ' s')
 
-        influencedRow = []
-        cursorDescription = []
-
-        influencedRow.append(cursor.rowcount)
-        cursorDescription.append(cursor.description)
-        if databaseType == 'mysql':
-            while cursor.nextset():
-                influencedRow.append(cursor.rowcount)
-                cursorDescription.append(cursor.description)
+        # influencedRow = []
+        # cursorDescription = []
+        if databaseType != 'mongodb':
+            influencedRow.append(cursor.rowcount)
+            cursorDescription.append(cursor.description)
+            # print(cursor.rowcount, cursor.description)
+            if databaseType == 'mysql':
+                while cursor.nextset():
+                    influencedRow.append(cursor.rowcount)
+                    cursorDescription.append(cursor.description)
 
         totalRecords.append(influencedRow)
         executedTimeStamp.append(datetime.now().strftime("%m/%d/%Y %H:%M:%S"))
@@ -298,6 +329,19 @@ def ajax(request):
                     queryResult.append(cursor.fetchmany(size=100))
                 else:
                     queryResult.append(())
+            elif databaseType == 'mongodb':
+                tempResult = []
+                for row in mongoListCursor[:100]:
+                    tempTuple = []
+                    for k, v in row.items():
+                        if k == '_id':
+                            tempTuple.append(str(v))
+                        else:
+                            tempTuple.append(v)
+                    tempTuple = tuple(tempTuple)
+                    tempResult.append(tempTuple)
+                    # tempResult.append(tuple(row.values()))
+                queryResult.append(tuple(tempResult))
         except Exception as e:
             responseStatus = 1
             traceback.print_exc()
@@ -352,33 +396,3 @@ def ajax(request):
          'executionTime': executionTime,
          'totalExecutionTime': str(round(totalExecutionTime, 2)) + ' s',
          'currentDatabase': str(currentDatabase)})
-
-
-# def sqlToMongo(query):
-#     if str(query[:6]).lower() == 'select':
-
-
-def testMongo(request):
-    databaseType = request.POST.get('databaseType')
-    responseStatus = 0  # 0 for no error, 1 for error
-    db = None
-    try:
-        db = mongoClient["instacart"]
-    except Exception as e:
-        responseStatus = 1
-        traceback.print_exc()
-        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
-    result = ''
-    query = "db[\"instacart_fact_table\"].find().limit(1)"
-    cur = eval(query)
-    # cur = db["instacart_fact_table"].find().limit(1)
-    for doc in cur:
-        print(doc)
-    try:
-        result = db.name
-    except Exception as e:
-        responseStatus = 1
-        traceback.print_exc()
-        return JsonResponse({'responseStatus': responseStatus, 'errorDetails': str(e)})
-
-    return JsonResponse({'currentDatabase': result})

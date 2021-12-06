@@ -68,8 +68,11 @@
                             document.getElementById('execution-time').innerText = totalExecutionTime;
                             currentDatabaseName.innerText = currentDatabase;
 
+
+
                             for(let i in tableQuery){
 
+                                console.log(influencedRowResult[i])
                                 let p = document.createElement('p');
                                 p.id = 'result' + i;
                                 p.innerHTML =  "<span style='color: green'>" + currentDatabaseName.innerText + " ></span></br>" +
@@ -158,6 +161,7 @@
             return formatResult
         }
         function updateData(databaseType, attribute, resultTable, query, totalRecords, resultIndex){
+            currentDatabaseName = document.getElementById('current-database');      // selected database/schema
             let columns = [];
             for(let i in attribute){
                 columns.push({data: "\'" + attribute[i] + "\'"});
@@ -173,6 +177,7 @@
                         'type': 'POST',
                         'data': {
                             'databaseType': databaseType,
+                            'currentDatabase': currentDatabaseName.innerText,
                             totalRecords: totalRecords,
                             'query': query,
                             'attribute[]': attribute,
@@ -186,6 +191,7 @@
                     'lengthMenu': [[10, 25, 50], [10, 25, 50]],
                     searching: false,
                     sort: false,
+                    // columnDefs:[{'defaultContent': '-', 'target': '_all'}],
                     'columns':columns
                 });
         }
