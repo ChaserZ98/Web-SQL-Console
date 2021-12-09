@@ -242,7 +242,7 @@ def ajax(request):
         startTime = time.time()
         try:
             if databaseType == 'mongodb':
-                print(sql)
+                # print(sql)
                 if sql.lower() == 'show dbs' or sql.lower() == 'show dbs;':
                     # print(mongoClient.list_database_names(), type(mongoClient.list_database_names()))
                     influencedRow.append(len(mongoClient.list_database_names()))
@@ -255,7 +255,7 @@ def ajax(request):
                     cursorDescription.append(None)
                 else:
                     mongoQuery = sql2MongoShell(sql)
-                    print(mongoQuery)
+                    print(f'MongoDB Query: {mongoQuery}')
                     mongoCursor = eval(mongoQuery)
                     mongoListCursor = list(mongoCursor)
                     influencedRow.append(len(mongoListCursor))

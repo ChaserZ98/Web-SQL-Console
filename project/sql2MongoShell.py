@@ -283,6 +283,8 @@ def recursiveParseWhere(fields):
     # print(f'fields: {fields}')
     if type(fields) is not dict:
         return fields
+    if type(fields) is dict and fields.get('literal'):
+        return fields.get('literal')
     operator = None
     booleanOperator = False
     comparisonOperator = False
@@ -522,9 +524,10 @@ def sql2MongoShell(sql):
         return convertSelect(tokens)
     return None
 
+
 # test
 if __name__ == '__main__':
-    sql = "select product_id, aisle_id, department_id, order_id from instacart_fact_table where product_id = 1 and aisle_id = 61 and department_id = 19"
+    sql = "select product_id from instacart_fact_table where aisle='soap'"
     tokens = parse(sql)
     # tokens = parse("use adni")
     # print(list(tokens.keys())[0])
