@@ -144,10 +144,10 @@ def updateData(request):
                 mongoListCursor = []
                 for name in mongoClient.list_database_names():
                     mongoListCursor.append({'database': name})
-            elif query.lower() == 'show collections' or query.lower() == 'show collections;':
+            elif query.lower() == 'show tables' or query.lower() == 'show tables;':
                 mongoListCursor = []
                 for name in db.list_collection_names():
-                    mongoListCursor.append({'collection': name})
+                    mongoListCursor.append({f'Tables_in_{db.name}': name})
             else:
                 mongoQuery = sql2MongoShell(query)
                 mongoCursor = eval(mongoQuery)
@@ -252,9 +252,9 @@ def ajax(request):
                     influencedRow.append(len(mongoClient.list_database_names()))
                     cursorDescription.append((('database',),))
                     # print(cursorDescription)
-                elif sql.lower() == 'show collections' or sql.lower() == 'show collections;':
+                elif sql.lower() == 'show tables' or sql.lower() == 'show tables;':
                     influencedRow.append(len(db.list_collection_names()))
-                    cursorDescription.append((('collection',),))
+                    cursorDescription.append(((f'Tables_in_{db.name}',),))
                 elif sql.lower()[:3] == 'use':
                     databaseName = "".join(letter if letter != ';' else '' for letter in sql[4:])
                     db = mongoClient[databaseName]
