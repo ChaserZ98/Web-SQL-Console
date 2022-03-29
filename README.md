@@ -9,7 +9,7 @@
 <div align="center">
   <h1 align="center">Web SQL Console</h1>
   <p align="center">
-    An web application to connect to different types of databases and execute SQL scripts
+    A web application to connect to different types of databases and execute SQL scripts
     <br />
     <a href="https://GitHub.com/ChaserZ98/Web-SQL-Console"><strong>Explore the docs »</strong></a>
     <br />
