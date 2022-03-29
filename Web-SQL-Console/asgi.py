@@ -1,5 +1,5 @@
 """
-ASGI config for cs527_web_project project.
+ASGI config for Web-SQL-Console project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cs527_web_project.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Web-SQL-Console.settings')
 
 application = get_asgi_application()

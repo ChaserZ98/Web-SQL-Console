@@ -244,4 +244,4 @@ uwsgi/*.pid
 uwsgi/*.sock
 
 # django project settings
-cs527_web_project/settings.py
+Web-SQL-Console/settings.py
