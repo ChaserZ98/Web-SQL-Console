@@ -3,7 +3,7 @@
 [![commits](https://badgen.net/github/commits/ChaserZ98/Web-SQL-Console/main)](https://GitHub.com/ChaserZ98/Web-SQL-Console/graphs/commit-activity)
 [![forks](https://badgen.net/github/forks/ChaserZ98/Web-SQL-Console)](https://GitHub.com/ChaserZ98/Web-SQL-Console/network/members)
 [![stars](https://badgen.net/github/stars/ChaserZ98/Web-SQL-Console)](https://GitHub.com/ChaserZ98/Web-SQL-Console/stargazers)
-[![issues](https://img.shields.io/github/issues/ChaserZ98/Web-SQL-Console)](https://GitHub.com/ChaserZ98/Web-SQL-Console/issues/)
+[![issues](https://badgen.net/github/issues/ChaserZ98/Web-SQL-Console)](https://GitHub.com/ChaserZ98/Web-SQL-Console/issues/)
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
 
 <div align="center">
