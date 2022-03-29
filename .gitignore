@@ -242,3 +242,6 @@ fabric.properties
 # uWSGI configuration file
 uwsgi/*.pid
 uwsgi/*.sock
+
+# django project settings
+cs527_web_project/settings.py
