@@ -1,10 +1,11 @@
 <div id="top"></div>
 
-[![commits](https://badgen.net/github/commits/ChaserZ98/Web-SQL-Console/main)](https://GitHub.com/ChaserZ98/Web-SQL-Console/graphs/commit-activity)
-[![forks](https://badgen.net/github/forks/ChaserZ98/Web-SQL-Console)](https://GitHub.com/ChaserZ98/Web-SQL-Console/network/members)
-[![stars](https://badgen.net/github/stars/ChaserZ98/Web-SQL-Console)](https://GitHub.com/ChaserZ98/Web-SQL-Console/stargazers)
-[![issues](https://badgen.net/github/issues/ChaserZ98/Web-SQL-Console)](https://GitHub.com/ChaserZ98/Web-SQL-Console/issues/)
-[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
+<!-- PROJECT SHIELDS -->
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![MIT License][license-shield]][license-url]
 
 <div align="center">
   <h1 align="center">Web SQL Console</h1>
@@ -14,7 +15,7 @@
     <a href="https://GitHub.com/ChaserZ98/Web-SQL-Console"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://GitHub.com/ChaserZ98/Web-SQL-Console">View Demo</a>
+    <a href="#usage">View Demo</a>
     ·
     <a href="https://GitHub.com/ChaserZ98/Web-SQL-Console/issues">Report Bug</a>
     ·
@@ -39,7 +40,7 @@
 
 ## About The Project
 
-This is a course project of Rutgers CS527 Database System for Data Science.
+This repository provides an web implementation that can connect to different types of databases including MySQL, PostgreSQL, and MongoDB and switch between them. It can accept and execute SQL scripts and display the corresponding result on the web page. With the help of a translation module, the application can also accept MongoDB access using SQL scripts.
 
 ### Built with
 
@@ -73,9 +74,27 @@ This is a course project of Rutgers CS527 Database System for Data Science.
 
 ## Usage
 
-Connect to MySQL/Redshift/MongoDB and switch between them.
+### Connect database
 
-Execute SQL scripts and show the correct results with the elapsed time.
+- MySQL
+    
+    <img src="https://github.com/ChaserZ98/Web-SQL-Console/blob/main/img/MySQL%20Connection.GIF?raw=true" alt="MySQL Connection" height="300" />
+
+- PostgreSQL (AWS Redshift)
+    
+    <img src="https://github.com/ChaserZ98/Web-SQL-Console/blob/main/img/Redshift%20Connection.GIF?raw=true" alt="Redshift Connection" height="300" />
+
+- MongoDB
+    
+    <img src="https://github.com/ChaserZ98/Web-SQL-Console/blob/main/img/MongoDB%20Connection.GIF?raw=true" alt="MongoDB Connection" height="300" />
+
+### Switch database
+
+<img src="https://github.com/ChaserZ98/Web-SQL-Console/blob/main/img/Database%20Switch.GIF?raw=true" alt="Database Switch" height="300" />
+
+### Execute SQL scripts with paged results and elapsed time
+
+<img src="https://github.com/ChaserZ98/Web-SQL-Console/blob/main/img/SQL%20Scripts%20Execution.GIF?raw=true" alt="SQL Scripts Execution" height="300" />
 
 ## License
 
@@ -90,3 +109,19 @@ Feiyu Zheng - [feiyuzheng98@gmail.com](mailto:feiyuzheng98@gmail.com)
 Project Link: [https://github.com/ChaserZ98/Web-SQL-Console](https://github.com/ChaserZ98/Web-SQL-Console)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[contributors-shield]: https://img.shields.io/github/contributors/ChaserZ98/Fisher.svg?style=for-the-badge
+[contributors-url]: https://github.com/ChaserZ98/Web-SQL-Console/graphs/contributors
+
+[forks-shield]: https://img.shields.io/github/forks/ChaserZ98/Fisher.svg?style=for-the-badge
+[forks-url]: https://github.com/ChaserZ98/Web-SQL-Console/network/members
+
+[stars-shield]: https://img.shields.io/github/stars/ChaserZ98/Fisher.svg?style=for-the-badge
+[stars-url]: https://github.com/ChaserZ98/Web-SQL-Console/stargazers
+
+[issues-shield]: https://img.shields.io/github/issues/ChaserZ98/Fisher.svg?style=for-the-badge
+[issues-url]: https://github.com/ChaserZ98/Web-SQL-Console/issues
+
+[license-shield]: https://img.shields.io/github/license/ChaserZ98/Fisher.svg?style=for-the-badge
+[license-url]: https://github.com/ChaserZ98/Web-SQL-Console/blob/master/LICENSE.txt
